@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "723333968594",
+    "project_id": "mycelengan-a479d",
+    "storage_bucket": "mycelengan-a479d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:723333968594:android:179f27654316ee1cbe730b",
+        "android_client_info": {
+          "package_name": "com.mycelengan"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDqEGKxVKHf3SzwdgFFWAKu65OEIOU-AJk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
