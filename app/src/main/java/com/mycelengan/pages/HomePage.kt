@@ -50,12 +50,14 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Train
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
@@ -96,6 +98,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
@@ -107,6 +114,7 @@ import com.mycelengan.ui.theme.bluelogo
 import com.mycelengan.ui.theme.colorExpense
 import com.mycelengan.ui.theme.colorIncome
 import com.mycelengan.ui.theme.expensePercent
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -134,20 +142,22 @@ fun HomePage(
         NavItem("Pengaturan", Icons.Default.Settings)
     )
 
-    var selectedIndex by rememberSaveable { mutableStateOf(0) }
+    // ==========================
+    //  SETUP PAGER
+    // ==========================
+    val pagerState = rememberPagerState(initialPage = 0) { 3 }
+    val scope = rememberCoroutineScope()
 
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var openSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     if (openSheet) {
         ModalBottomSheet(
             sheetState = sheetState,
             onDismissRequest = { openSheet = false }
         ) {
-            when (selectedIndex) {
-                0 -> DrawerHome(authViewModel, onSaved = {
-                    openSheet = false
-                })
+            when (pagerState.currentPage) {
+                0 -> DrawerHome(authViewModel) { openSheet = false }
                 1 -> DrawerTarget()
             }
         }
@@ -155,18 +165,24 @@ fun HomePage(
 
     Scaffold(
         topBar = {
-            when (selectedIndex) {
+            when (pagerState.currentPage) {
                 0 -> TopAppBar(title = { Text("MyCelengan", fontWeight = FontWeight.Bold) })
                 1 -> TopAppBar(title = { Text("Target", fontWeight = FontWeight.Bold) })
                 2 -> TopAppBar(title = { Text("Pengaturan", fontWeight = FontWeight.Bold) })
             }
         },
         bottomBar = {
-            NavigationBar {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.background
+            ) {
                 navItemList.forEachIndexed { index, navItem ->
                     NavigationBarItem(
-                        selected = index == selectedIndex,
-                        onClick = { selectedIndex = index },
+                        selected = pagerState.currentPage == index,
+                        onClick = {
+                            scope.launch {
+                                pagerState.animateScrollToPage(index) // ⬅ geser halus
+                            }
+                        },
                         icon = { Icon(navItem.icon, contentDescription = navItem.label) },
                         label = { Text(navItem.label) },
                         colors = NavigationBarItemDefaults.colors(
@@ -177,7 +193,7 @@ fun HomePage(
             }
         },
         floatingActionButton = {
-            if (selectedIndex != 2) {
+            if (pagerState.currentPage != 2) {
                 FloatingActionButton(
                     onClick = { openSheet = true },
                     containerColor = bluelogo,
@@ -186,17 +202,34 @@ fun HomePage(
                     Icon(Icons.Default.Add, contentDescription = "add")
                 }
             }
-        },
-        floatingActionButtonPosition = FabPosition.End
+        }
     ) { innerPadding ->
-        ContentScreen(
-            modifier = Modifier.padding(innerPadding),
-            selectedIndex = selectedIndex,
-            authViewModel = authViewModel,
-            navController = navController,
-            darkMode = darkMode,
-            onDarkModeChange = onDarkModeChange
-        )
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.padding(innerPadding)
+        ) { page ->
+
+            when (page) {
+                0 -> HomeContent(
+                    modifier = Modifier.fillMaxSize(),
+                    authViewModel = authViewModel
+                )
+
+                1 -> TargetPage(
+                    modifier = Modifier.fillMaxSize(),
+                    navController = navController
+                )
+
+                2 -> PengaturanPage(
+                    modifier = Modifier.fillMaxSize(),
+                    navController = navController,
+                    authViewModel = authViewModel,
+                    darkMode = darkMode,
+                    onDarkModeChange = onDarkModeChange
+                )
+            }
+        }
     }
 }
 
@@ -210,6 +243,8 @@ fun HomeContent(
     val income = authViewModel.totalIncome.observeAsState(0)
     val expense = authViewModel.totalExpense.observeAsState(0)
     val transactions = authViewModel.transactions.observeAsState(emptyList())
+    var selectedTab by remember { mutableStateOf(0) }
+    // 0 = semua, 1 = pemasukan, 2 = pengeluaran
 
     LazyColumn(
         modifier = modifier
@@ -236,7 +271,172 @@ fun HomeContent(
             }
         }
 
-        items(transactions.value) { item ->
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp)
+                    .background(
+                        MaterialTheme.colorScheme.surfaceContainerLow,
+                        RoundedCornerShape(12.dp)
+                    )
+                    .padding(6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+
+                val tabs = listOf("Semua", "Pemasukan", "Pengeluaran")
+
+                tabs.forEachIndexed { index, label ->
+                    val isSelected = selectedTab == index
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                else Color.Transparent
+                            )
+                            .clickable { selectedTab = index }
+                            .padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+        }
+
+
+        // CEK APAKAH TRANSAKSI KOSONG
+        if (transactions.value.isEmpty()) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 40.dp, bottom = 80.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(50.dp)
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Text(
+                        "Transaksi masih kosong",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    Text(
+                        "Silahkan tekan tombol + untuk menambah transaksi",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+
+            return@LazyColumn   // hentikan agar items() tidak dipanggil
+        }
+
+        // FILTER
+        val filteredTransactions = when (selectedTab) {
+            1 -> transactions.value.filter { it["type"] == "income" }      // pemasukan
+            2 -> transactions.value.filter { it["type"] == "expense" }     // pengeluaran
+            else -> transactions.value                                      // semua
+        }
+
+        if (filteredTransactions.isEmpty()) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 40.dp, bottom = 80.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(50.dp)
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = when (selectedTab) {
+                            1 -> "Belum ada pemasukan"
+                            2 -> "Belum ada pengeluaran"
+                            else -> "Belum ada transaksi"
+                        },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Silahkan tekan tombol + untuk menambahkan",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+            return@LazyColumn
+        }
+
+
+        items(filteredTransactions) { item ->
+
+            val raw = item["amount"].toString()
+            val formattedAmount = formatRupiahStr(raw)
+
+            val finalAmount = if (item["type"] == "income")
+                "+Rp$formattedAmount"
+            else
+                "-Rp$formattedAmount"
+
+            // State untuk dialog konfirmasi
+            var showDeleteDialog by remember { mutableStateOf(false) }
+
+            // Dialog Konfirmasi Hapus
+            if (showDeleteDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteDialog = false },
+                    title = { Text("Hapus Transaksi") },
+                    text = { Text("Apakah Anda yakin ingin menghapus transaksi ini?") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val transactionId = item["id"].toString()
+                                val amount = item["amount"].toString().toIntOrNull() ?: 0
+                                val type = item["type"].toString()
+
+                                authViewModel.deleteTransaction(transactionId, amount, type)
+                                showDeleteDialog = false
+                            }
+                        ) {
+                            Text("Hapus", color = colorExpense)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteDialog = false }) {
+                            Text("Batal")
+                        }
+                    }
+                )
+            }
+
             TransactionCard(
                 item = TransactionItem(
                     icon = when (item["icon"]) {
@@ -249,26 +449,25 @@ fun HomeContent(
                     },
                     title = item["desc"].toString(),
                     date = item["date"].toString(),
-                    amount = if (item["type"] == "income")
-                        "+Rp${item["amount"]}"
-                    else
-                        "-Rp${item["amount"]}",
+                    amount = finalAmount,
                     amountColor = if (item["type"] == "income") colorIncome else colorExpense
                 ),
-                onClick = {}
+                onLongClick = {
+                    showDeleteDialog = true
+                }
             )
-        }
-
-
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(onClick = { authViewModel.signout() }) {
-                Text("Sign out")
-            }
-        }
+        }   
     }
 }
 
+fun formatRupiahStr(value: String): String {
+    return value
+        .replace(".", "")
+        .reversed()
+        .chunked(3)
+        .joinToString(".")
+        .reversed()
+}
 
 
 @Composable
@@ -282,22 +481,13 @@ fun SaldoCardUI(
             .fillMaxWidth()
             .padding(bottom = 16.dp),
         shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                            MaterialTheme.colorScheme.surface
-                        )
-                    )
-                )
         ) {
             Column(
                 modifier = Modifier
@@ -330,14 +520,15 @@ fun SaldoCardUI(
                         .padding(vertical = 12.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                    )
+                        containerColor = Color.Transparent
+                    ),
+                    border = BorderStroke(1.dp, bluelogo.copy(alpha = 0.3f))
                 ) {
                     Text(
-                        text = "Rp$saldo",
+                        text = "Rp${formatRupiah(saldo.toString())}",
                         fontSize = 40.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 16.dp),
@@ -357,7 +548,7 @@ fun SaldoCardUI(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = colorIncome.copy(alpha = 0.1f)
+                            containerColor = MaterialTheme.colorScheme.background .copy(alpha = 0.1f)
                         ),
                         border = BorderStroke(1.dp, colorIncome.copy(alpha = 0.3f))
                     ) {
@@ -379,7 +570,7 @@ fun SaldoCardUI(
                                 textAlign = TextAlign.Center
                             )
                             Text(
-                                text = "Rp$income",
+                                text = "Rp${formatRupiah(income.toString())}",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colorIncome,
@@ -394,7 +585,7 @@ fun SaldoCardUI(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = colorExpense.copy(alpha = 0.1f)
+                            containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.1f)
                         ),
                         border = BorderStroke(1.dp, colorExpense.copy(alpha = 0.3f))
                     ) {
@@ -416,7 +607,7 @@ fun SaldoCardUI(
                                 textAlign = TextAlign.Center
                             )
                             Text(
-                                text = "Rp$expense",
+                                text = "Rp${formatRupiah(expense.toString())}",
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = colorExpense,
@@ -435,15 +626,17 @@ fun SaldoCardUI(
 @Composable
 fun TransactionCard(
     item: TransactionItem,
-    onClick: () -> Unit
+    onLongClick: () -> Unit  // Tambahkan parameter ini
 ) {
     Card(
-        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 6.dp)
+            .combinedClickable(
+                onClick = { },
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
@@ -454,6 +647,7 @@ fun TransactionCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Icon(
                 imageVector = item.icon,
                 contentDescription = null,
@@ -466,16 +660,8 @@ fun TransactionCard(
                     .weight(1f)
                     .padding(horizontal = 16.dp)
             ) {
-                Text(
-                    item.title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    item.date,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text(item.date, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Text(
@@ -485,8 +671,14 @@ fun TransactionCard(
                 color = item.amountColor
             )
         }
+
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant,
+            thickness = 1.dp
+        )
     }
 }
+
 
 
 data class TransactionItem(
@@ -534,7 +726,13 @@ fun ContentScreen(
     when (selectedIndex) {
         0 -> HomeContent(modifier = modifier, authViewModel)
         1 -> TargetPage(modifier = modifier, navController)
-        2 -> PengaturanPage(modifier = modifier, navController, authViewModel, darkMode = darkMode, onDarkModeChange = onDarkModeChange)
+        2 -> PengaturanPage(
+            modifier = modifier,
+            navController,
+            authViewModel,
+            darkMode = darkMode,
+            onDarkModeChange = onDarkModeChange
+        )
     }
 }
 
@@ -548,7 +746,7 @@ fun formatRupiah(input: String): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DrawerHome(authViewModel: AuthViewModel,onSaved: () -> Unit) {
+fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 
     var selectedTab by remember { mutableStateOf(0) } // 0 pengeluaran, 1 pemasukan
     var amount by remember { mutableStateOf("") }
@@ -558,7 +756,6 @@ fun DrawerHome(authViewModel: AuthViewModel,onSaved: () -> Unit) {
     val rawAmount = amount.replace(".", "")
     val isFormValid = rawAmount.isNotEmpty() && desc.isNotEmpty() && date.isNotEmpty()
     val context = LocalContext.current
-
 
 
     val icons = listOf(
@@ -749,10 +946,6 @@ fun DrawerHome(authViewModel: AuthViewModel,onSaved: () -> Unit) {
         }
 
 
-
-
-
-
         // ========================== ICON PICKER ==========================
         item {
             Text("Pilih Icon", fontWeight = FontWeight.SemiBold)
@@ -819,7 +1012,6 @@ fun DrawerHome(authViewModel: AuthViewModel,onSaved: () -> Unit) {
         }
     }
 }
-
 
 
 @Composable
@@ -970,7 +1162,6 @@ fun DrawerTarget() {
         }
     }
 }
-
 
 
 data class NavItem(

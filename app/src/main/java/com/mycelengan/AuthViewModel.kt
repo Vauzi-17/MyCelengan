@@ -1,5 +1,6 @@
 package com.mycelengan
 
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -124,17 +125,22 @@ class AuthViewModel : ViewModel() {
             }
 
         // transaksi realtime (DESCENDING)
+        // transaksi realtime (DESCENDING) - UPDATE BAGIAN INI
         db.collection("users")
             .document(uid)
             .collection("transactions")
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
-                    val list = snapshot.documents.map { it.data ?: emptyMap<String, Any>() }
+                    val list = snapshot.documents.map { doc ->
+                        val data = doc.data?.toMutableMap() ?: mutableMapOf()
+                        data["id"] = doc.id // Tambahkan ID dokumen
+                        data
+                    }
                     _transactions.value = list
                 }
             }
-    }
+        }
 
     fun addTransaction(
         amount: Int,
@@ -178,6 +184,40 @@ class AuthViewModel : ViewModel() {
                     "timestamp" to FieldValue.serverTimestamp()
                 )
             )
+        }
+    }
+
+    fun deleteTransaction(transactionId: String, amount: Int, type: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val userRef = db.collection("users").document(uid)
+
+        db.runTransaction { tr ->
+            val doc = tr.get(userRef)
+            val oldSaldo = doc.getLong("saldo")?.toInt() ?: 0
+            val oldIncome = doc.getLong("totalIncome")?.toInt() ?: 0
+            val oldExpense = doc.getLong("totalExpense")?.toInt() ?: 0
+
+            // Kembalikan nilai sesuai tipe transaksi
+            val newSaldo = if (type == "income") oldSaldo - amount else oldSaldo + amount
+            val newIncome = if (type == "income") oldIncome - amount else oldIncome
+            val newExpense = if (type == "expense") oldExpense - amount else oldExpense
+
+            tr.update(
+                userRef,
+                mapOf(
+                    "saldo" to newSaldo,
+                    "totalIncome" to newIncome,
+                    "totalExpense" to newExpense
+                )
+            )
+
+            // Hapus dokumen transaksi
+            val transRef = userRef.collection("transactions").document(transactionId)
+            tr.delete(transRef)
+        }.addOnSuccessListener {
+            Log.d("AuthViewModel", "Transaksi berhasil dihapus")
+        }.addOnFailureListener { e ->
+            Log.e("AuthViewModel", "Gagal menghapus transaksi: ${e.message}")
         }
     }
 

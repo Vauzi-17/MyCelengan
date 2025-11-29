@@ -68,7 +68,7 @@ fun LoginPage(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp)      // konsisten dengan halaman lain
+            .padding(horizontal = 24.dp)
             .imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

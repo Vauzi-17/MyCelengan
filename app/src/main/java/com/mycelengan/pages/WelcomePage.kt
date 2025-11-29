@@ -67,7 +67,6 @@ fun WelcomePage(
         }
     }
 
-    // Safety return kalau user authenticated
     if (authState.value is AuthState.Authenticated) return
 
     Box(
@@ -75,7 +74,6 @@ fun WelcomePage(
             .fillMaxSize()
             .imePadding()
     ) {
-        // ----------- TOP BAR CUSTOM (di atas) -----------
         Row(
             modifier = Modifier
                 .fillMaxWidth()
