@@ -99,8 +99,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material.icons.filled.CardGiftcard
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Flight
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.sp
@@ -158,7 +170,10 @@ fun HomePage(
         ) {
             when (pagerState.currentPage) {
                 0 -> DrawerHome(authViewModel) { openSheet = false }
-                1 -> DrawerTarget()
+                1 -> DrawerTarget(
+                    authViewModel = authViewModel,
+                    onSaved = { openSheet = false }
+                )
             }
         }
     }
@@ -218,7 +233,8 @@ fun HomePage(
 
                 1 -> TargetPage(
                     modifier = Modifier.fillMaxSize(),
-                    navController = navController
+                    navController = navController,
+                    authViewModel = authViewModel
                 )
 
                 2 -> PengaturanPage(
@@ -725,7 +741,7 @@ fun ContentScreen(
 ) {
     when (selectedIndex) {
         0 -> HomeContent(modifier = modifier, authViewModel)
-        1 -> TargetPage(modifier = modifier, navController)
+        1 -> TargetPage(modifier = modifier, navController, authViewModel)
         2 -> PengaturanPage(
             modifier = modifier,
             navController,
@@ -1014,146 +1030,157 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DrawerTarget() {
+fun DrawerTarget(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 
-    var targetname by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var subtitle by remember { mutableStateOf("") }
+    var targetAmount by remember { mutableStateOf("") }
+    var perMonth by remember { mutableStateOf("") }
+    var createdDate by remember { mutableStateOf("") }
 
-    var selectedImage by remember { mutableStateOf<Uri?>(null) }
+    LaunchedEffect(Unit) {
+        createdDate = formatDate(System.currentTimeMillis())
+    }
 
-    // Gallery launcher
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia(),
-        onResult = { uri -> selectedImage = uri }
+    val icons = listOf(
+        "flight" to Icons.Default.Flight,
+        "phone" to Icons.Default.Smartphone,
+        "shopping" to Icons.Default.ShoppingCart,
+        "home" to Icons.Default.Home,
+        "gift" to Icons.Default.CardGiftcard,
+        "savings" to Icons.Default.Savings
     )
 
-
+    var selectedIcon by remember { mutableStateOf("flight") }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .imePadding(),        // naik kalau keyboard muncul
+            .imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
         item {
-            Text(
-                "Tambah Target",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-
+            Text("Tambah Target", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(20.dp))
         }
 
-        // Foto Target
+        // Icon Picker
         item {
-            Box(
-                modifier = Modifier
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurface),
-                contentAlignment = Alignment.Center
+            Text("Pilih Icon", fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                if (selectedImage == null) {
+                icons.forEach { (key, vector) ->
                     Icon(
-                        imageVector = Icons.Default.Image,
-                        contentDescription = "placeholder",
-                        tint = Color.Gray,
-                        modifier = Modifier.size(48.dp)
-                    )
-                } else {
-                    AsyncImage(
-                        model = selectedImage,
+                        imageVector = vector,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        tint = if (selectedIcon == key)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (selectedIcon == key)
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                else
+                                    Color.Transparent
+                            )
+                            .padding(8.dp)
+                            .clickable { selectedIcon = key }
                     )
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
-
-            Text("Gambar target", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text("Unggah gambar untuk target tabunganmu", color = MaterialTheme.colorScheme.outline)
-            Spacer(Modifier.height(16.dp))
-
-            OutlinedButton(onClick = {
-                launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }) {
-                Text("Pilih Gambar")
-            }
-
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
         }
 
         // Nama target
         item {
             OutlinedTextField(
-                value = targetname,
-                onValueChange = { targetname = it },
-                label = { Text("Apa yang ingin kamu capai?") },
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nama Target") },
                 modifier = Modifier.fillMaxWidth()
             )
-
             Spacer(Modifier.height(16.dp))
         }
 
-        // Nominal
+        // Subjudul
         item {
             OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = { Text("Berapa nominal yang dibutuhkan") },
+                value = subtitle,
+                onValueChange = { subtitle = it },
+                label = { Text("Deskripsi Target (opsional)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(16.dp))
+        }
+
+        // Target Amount
+        item {
+            OutlinedTextField(
+                value = targetAmount,
+                onValueChange = { targetAmount = it },
+                label = { Text("Total Target (Rp)") },
                 leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
-
             Spacer(Modifier.height(16.dp))
         }
 
-        // Tanggal
+        // Per bulan
         item {
             OutlinedTextField(
-                value = date,
-                onValueChange = { date = it },
-                label = { Text("Kapan target tercapai? (contoh: 12 Jan 2024)") },
-                leadingIcon = { Icon(Icons.Default.Alarm, null) },
+                value = perMonth,
+                onValueChange = { perMonth = it },
+                label = { Text("Nabung per bulan (Rp)") },
+                leadingIcon = { Icon(Icons.Default.Savings, null) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
-
             Spacer(Modifier.height(16.dp))
         }
 
-        // Catatan
+        // Tanggal dibuat
         item {
             OutlinedTextField(
-                value = note,
-                onValueChange = { note = it },
-                label = { Text("Catatan tambahan") },
-                leadingIcon = { Icon(Icons.Default.Info, null) },
+                value = createdDate,
+                onValueChange = { },
+                label = { Text("Tanggal dibuat") },
+                readOnly = true,
+                leadingIcon = { Icon(Icons.Default.CalendarMonth, null) },
                 modifier = Modifier.fillMaxWidth()
             )
-
             Spacer(Modifier.height(24.dp))
         }
 
-        // Simpan Button
+        // Tombol Simpan
         item {
             Button(
                 onClick = {
-
+                    authViewModel.addTarget(
+                        title = name,
+                        subtitle = subtitle,
+                        icon = selectedIcon,
+                        targetAmount = targetAmount.toIntOrNull() ?: 0,
+                        perMonth = perMonth.toIntOrNull() ?: 0,
+                        createdAt = createdDate
+                    )
+                    onSaved()
                 },
+                modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = bluelogo,
-                    contentColor = MaterialTheme.colorScheme.background
-                ),
-                modifier = Modifier.fillMaxWidth()
+                    containerColor = bluelogo
+                )
             ) {
                 Text("Simpan Target")
             }
@@ -1162,6 +1189,8 @@ fun DrawerTarget() {
         }
     }
 }
+
+
 
 
 data class NavItem(

@@ -53,8 +53,10 @@ fun MyAppNavigation(
             WelcomePage(modifier, navController, authViewModel)
         }
 
-        composable("jalan") {
-            jalan(modifier,navController)
+        composable("targetDetail/{id}") { backStack ->
+            val id = backStack.arguments?.getString("id") ?: ""
+            TargetDetailPage(targetId = id, navController = navController, authViewModel)
         }
+
     }
 }
