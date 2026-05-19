@@ -1,49 +1,56 @@
 package com.mycelengan
 
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.mycelengan.api.LaravelApi
+import java.util.concurrent.Executors
 
 class ProfileViewModel : ViewModel() {
 
-    private val auth = FirebaseAuth.getInstance()
-    private val db = FirebaseFirestore.getInstance()
+    private val executor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val _updateState = MutableLiveData<String?>()
     val updateState: LiveData<String?> = _updateState
 
-    private val uid: String get() = auth.currentUser!!.uid
-
-    // -------------------------
-    // UPDATE USERNAME
-    // -------------------------
     fun updateUsername(newName: String, authViewModel: AuthViewModel) {
-        db.collection("users").document(uid)
-            .update("username", newName)
-            .addOnSuccessListener {
+        runApi(
+            task = { LaravelApi.updateProfile(newName).toMap() },
+            onSuccess = { user ->
                 _updateState.value = "Username updated"
-
-                // ⬇⬇⬇  Kunci agar UI langsung berubah
-                authViewModel.setUsername(newName)
-            }
-            .addOnFailureListener {
-                _updateState.value = it.message
-            }
+                authViewModel.setUsername(user["username"].toString())
+                authViewModel.loadUserData()
+            },
+            onError = { _updateState.value = it }
+        )
     }
 
-
-    // -------------------------
-    // CHANGE PASSWORD
-    // -------------------------
     fun changePassword(newPassword: String) {
-        auth.currentUser?.updatePassword(newPassword)
-            ?.addOnSuccessListener {
-                _updateState.value = "Password updated"
+        runApi(
+            task = {
+                LaravelApi.changePassword(newPassword)
+                Unit
+            },
+            onSuccess = { _updateState.value = "Password updated" },
+            onError = { _updateState.value = it }
+        )
+    }
+
+    private fun <T> runApi(
+        task: () -> T,
+        onSuccess: (T) -> Unit,
+        onError: (String) -> Unit
+    ) {
+        executor.execute {
+            try {
+                val result = task()
+                mainHandler.post { onSuccess(result) }
+            } catch (e: Exception) {
+                mainHandler.post { onError(e.message ?: "Terjadi kesalahan") }
             }
-            ?.addOnFailureListener {
-                _updateState.value = it.message
-            }
+        }
     }
 }

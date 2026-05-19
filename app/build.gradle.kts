@@ -2,7 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.google.gms.google.services)
 }
 
 android {
@@ -57,23 +56,6 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
-
-    // ------------------------------------
-    // firebase
-    // ------------------------------------
-    implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
-
-    // Firebase Auth
-    implementation("com.google.firebase:firebase-auth")
-
-    // Firestore
-    implementation("com.google.firebase:firebase-firestore")
-    implementation("com.google.firebase:firebase-storage")
-
-    //
-    //
-
-    // ------------------------------------
 
     implementation(libs.androidx.runtime.livedata)
 

@@ -65,7 +65,6 @@ import com.mycelengan.ui.theme.bluelogo
 import com.mycelengan.ui.theme.colorExpense
 import com.mycelengan.ui.theme.colorIncome
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.Locale
 import kotlin.math.absoluteValue
 
@@ -349,10 +348,7 @@ fun HistoryRow(amount: Int, type: String, desc: String, timestamp: Any?) {
             Column {
                 Text(desc, fontWeight = FontWeight.Medium)
 
-                val dateString =
-                    (timestamp as? com.google.firebase.Timestamp)?.toDate()?.let {
-                        SimpleDateFormat("dd MMM yyyy", Locale("id", "ID")).format(it)
-                    } ?: ""
+                val dateString = timestamp?.toString()?.take(10).orEmpty()
 
                 Text(dateString, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
