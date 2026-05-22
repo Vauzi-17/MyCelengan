@@ -153,6 +153,28 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
+    fun addTransactions(transactions: List<TransactionDraft>, onComplete: () -> Unit = {}) {
+        val validTransactions = transactions.filter {
+            it.amount > 0 && it.desc.isNotBlank() && it.date.isNotBlank()
+        }
+        if (validTransactions.isEmpty()) {
+            _authState.value = AuthState.Error("Tidak ada transaksi yang valid")
+            return
+        }
+
+        runApi(
+            task = {
+                LaravelApi.addTransactions(validTransactions)
+                Unit
+            },
+            onSuccess = {
+                refreshAll()
+                onComplete()
+            },
+            onError = { _authState.value = AuthState.Error(it) }
+        )
+    }
+
     fun deleteTransaction(transactionId: String, amount: Int, type: String) {
         runApi(
             task = {

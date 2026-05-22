@@ -1,6 +1,7 @@
 package com.mycelengan.api
 
 import android.content.Context
+import com.mycelengan.TransactionDraft
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -9,7 +10,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object LaravelApi {
-    private const val BASE_URL = "http://10.212.67.214:8000/api/"
+    private const val BASE_URL = "http://192.168.137.1:8000/api/"
     private const val PREFS_NAME = "my_celengan_session"
     private const val TOKEN_KEY = "token"
 
@@ -106,6 +107,25 @@ object LaravelApi {
                 .put("type", type)
                 .put("icon", icon)
         )
+    }
+
+    fun addTransactions(transactions: List<TransactionDraft>) {
+        val body = JSONObject().put(
+            "transactions",
+            JSONArray().apply {
+                transactions.forEach { transaction ->
+                    put(
+                        JSONObject()
+                            .put("amount", transaction.amount)
+                            .put("desc", transaction.desc)
+                            .put("date", transaction.date)
+                            .put("type", transaction.type)
+                            .put("icon", transaction.icon)
+                    )
+                }
+            }
+        )
+        request(method = "POST", path = "transactions/bulk", body = body)
     }
 
     fun deleteTransaction(id: String) {

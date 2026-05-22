@@ -1,6 +1,10 @@
 package com.mycelengan.pages
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -81,6 +85,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -117,17 +122,28 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.mycelengan.AuthState
 import com.mycelengan.AuthViewModel
 import com.mycelengan.R
+import com.mycelengan.ReceiptParser
+import com.mycelengan.TransactionDraft
+import com.mycelengan.VoiceTransactionParser
 import com.mycelengan.pages.HomeElement.CustomProgressBar
+import com.mycelengan.transactionCategories
+import com.mycelengan.transactionCategoryIcon
 import com.mycelengan.ui.theme.bluelogo
 import com.mycelengan.ui.theme.colorExpense
 import com.mycelengan.ui.theme.colorIncome
 import com.mycelengan.ui.theme.expensePercent
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -456,14 +472,7 @@ fun HomeContent(
 
             TransactionCard(
                 item = TransactionItem(
-                    icon = when (item["icon"]) {
-                        "fastfood" -> Icons.Default.Fastfood
-                        "shopping" -> Icons.Default.ShoppingCart
-                        "train" -> Icons.Default.Train
-                        "money" -> Icons.Default.AttachMoney
-                        "edit" -> Icons.Default.Edit
-                        else -> Icons.Default.Edit
-                    },
+                    icon = transactionCategoryIcon(item["icon"].toString()),
                     title = item["desc"].toString(),
                     date = item["date"].toString(),
                     amount = finalAmount,
@@ -765,24 +774,117 @@ fun formatRupiah(input: String): String {
 @Composable
 fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 
+    var mode by remember { mutableStateOf(0) } // 0 manual, 1 scan, 2 banyak, 3 voice
     var selectedTab by remember { mutableStateOf(0) } // 0 pengeluaran, 1 pemasukan
     var amount by remember { mutableStateOf("") }
     var desc by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
-    var selectedIcon by remember { mutableStateOf("fastfood") }
+    var selectedIcon by remember { mutableStateOf("food") }
+    var scanStatus by remember { mutableStateOf("") }
+    var receiptPreview by remember { mutableStateOf<List<String>>(emptyList()) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    val bulkDrafts = remember { mutableStateListOf<TransactionDraft>() }
     val rawAmount = amount.replace(".", "")
     val isFormValid = rawAmount.isNotEmpty() && desc.isNotEmpty() && date.isNotEmpty()
     val context = LocalContext.current
+    val recognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
+    fun applyDraft(draft: TransactionDraft) {
+        selectedTab = if (draft.type == "income") 1 else 0
+        amount = if (draft.amount > 0) formatRupiah(draft.amount.toString()) else ""
+        desc = draft.desc
+        date = draft.date.ifBlank { formatDate(System.currentTimeMillis()) }
+        selectedIcon = draft.icon
+    }
 
-    val icons = listOf(
-        "fastfood" to Icons.Default.Fastfood,
-        "shopping" to Icons.Default.ShoppingCart,
-        "train" to Icons.Default.Train,
-        "money" to Icons.Default.AttachMoney,
-        "edit" to Icons.Default.Edit
-    )
+    fun createReceiptUri(): Uri {
+        val dir = File(context.cacheDir, "receipts").apply { mkdirs() }
+        val file = File.createTempFile("receipt_", ".jpg", dir)
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    }
 
+    fun processReceipt(uri: Uri) {
+        scanStatus = "Membaca struk..."
+        runCatching { InputImage.fromFilePath(context, uri) }
+            .onSuccess { image ->
+                recognizer.process(image)
+                    .addOnSuccessListener { result ->
+                        val parsed = ReceiptParser.parse(result.text, formatDate(System.currentTimeMillis()))
+                        if (parsed == null) {
+                            scanStatus = "Struk belum terbaca. Coba foto lebih jelas."
+                        } else {
+                            applyDraft(parsed.draft)
+                            receiptPreview = parsed.itemLines
+                            mode = 0
+                            scanStatus = "Hasil scan sudah masuk ke form. Silakan cek lalu simpan."
+                        }
+                    }
+                    .addOnFailureListener {
+                        scanStatus = it.message ?: "Gagal membaca struk"
+                    }
+            }
+            .onFailure {
+                scanStatus = it.message ?: "Gagal membuka gambar"
+            }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+        val uri = pendingCameraUri
+        if (success && uri != null) processReceipt(uri)
+        else scanStatus = "Pengambilan foto dibatalkan"
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            val uri = createReceiptUri()
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            scanStatus = "Izin kamera diperlukan untuk scan struk"
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) processReceipt(uri)
+        else scanStatus = "Tidak ada gambar dipilih"
+    }
+
+    val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val spoken = result.data
+            ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            ?.firstOrNull()
+        if (spoken.isNullOrBlank()) {
+            Toast.makeText(context, "Voice tidak terbaca", Toast.LENGTH_SHORT).show()
+            return@rememberLauncherForActivityResult
+        }
+        val parsed = VoiceTransactionParser.parse(spoken, formatDate(System.currentTimeMillis()))
+        if (parsed == null) {
+            Toast.makeText(context, "Nominal voice belum terbaca", Toast.LENGTH_SHORT).show()
+        } else {
+            applyDraft(parsed)
+            mode = 0
+            Toast.makeText(context, "Voice masuk ke form. Silakan cek lagi.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Contoh: beli makan 25000 hari ini kategori makanan")
+            }
+            voiceLauncher.launch(intent)
+        } else {
+            Toast.makeText(context, "Izin mikrofon diperlukan untuk voice input", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (date.isBlank()) {
+            date = formatDate(System.currentTimeMillis())
+        }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -801,7 +903,195 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
             Spacer(Modifier.height(20.dp))
         }
 
-        // ========================== TAB SWITCH ==========================
+        item {
+            val modes = listOf("Manual", "Scan Struk", "Banyak", "Voice")
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                modes.forEachIndexed { index, label ->
+                    OutlinedButton(
+                        onClick = { mode = index },
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = if (mode == index) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
+                        )
+                    ) {
+                        Text(label)
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
+        if (mode == 1) {
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                                val uri = createReceiptUri()
+                                pendingCameraUri = uri
+                                cameraLauncher.launch(uri)
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        }
+                    ) {
+                        Text("Kamera")
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                    ) {
+                        Text("Galeri")
+                    }
+                }
+                if (scanStatus.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(scanStatus, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (receiptPreview.isNotEmpty()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text("Preview item terbaca", fontWeight = FontWeight.SemiBold)
+                    receiptPreview.forEach {
+                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+
+        if (mode == 2) {
+            item {
+                if (bulkDrafts.isEmpty()) {
+                    bulkDrafts.add(TransactionDraft(date = formatDate(System.currentTimeMillis()), icon = "food"))
+                }
+
+                Text("Input Banyak Transaksi", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(8.dp))
+
+                bulkDrafts.forEachIndexed { index, draft ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLow)
+                    ) {
+                        Column(Modifier.padding(12.dp)) {
+                            var rowDesc by remember(draft) { mutableStateOf(draft.desc) }
+                            var rowAmount by remember(draft) {
+                                mutableStateOf(if (draft.amount > 0) formatRupiah(draft.amount.toString()) else "")
+                            }
+                            var rowDate by remember(draft) { mutableStateOf(draft.date.ifBlank { formatDate(System.currentTimeMillis()) }) }
+                            var rowType by remember(draft) { mutableStateOf(if (draft.type == "income") 1 else 0) }
+                            var rowIcon by remember(draft) { mutableStateOf(draft.icon.ifBlank { "food" }) }
+
+                            OutlinedTextField(
+                                value = rowDesc,
+                                onValueChange = {
+                                    rowDesc = it
+                                    bulkDrafts[index] = bulkDrafts[index].copy(desc = it)
+                                },
+                                label = { Text("Deskripsi") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = rowAmount,
+                                onValueChange = {
+                                    val raw = it.replace(".", "")
+                                    if (raw.all(Char::isDigit)) {
+                                        rowAmount = if (raw.isBlank()) "" else formatRupiah(raw)
+                                        bulkDrafts[index] = bulkDrafts[index].copy(amount = raw.toIntOrNull() ?: 0)
+                                    }
+                                },
+                                label = { Text("Nominal") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = rowDate,
+                                onValueChange = {
+                                    rowDate = it
+                                    bulkDrafts[index] = bulkDrafts[index].copy(date = it)
+                                },
+                                label = { Text("Tanggal") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterButton("Keluar", rowType == 0) {
+                                    rowType = 0
+                                    bulkDrafts[index] = bulkDrafts[index].copy(type = "expense")
+                                }
+                                FilterButton("Masuk", rowType == 1) {
+                                    rowType = 1
+                                    bulkDrafts[index] = bulkDrafts[index].copy(type = "income")
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            CategoryPicker(selectedIcon = rowIcon) {
+                                rowIcon = it
+                                bulkDrafts[index] = bulkDrafts[index].copy(icon = it)
+                            }
+                            TextButton(onClick = { bulkDrafts.removeAt(index) }) {
+                                Text("Hapus baris", color = colorExpense)
+                            }
+                        }
+                    }
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        bulkDrafts.add(TransactionDraft(date = formatDate(System.currentTimeMillis()), icon = "food"))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Tambah Baris")
+                }
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        authViewModel.addTransactions(bulkDrafts.toList()) {
+                            Toast.makeText(context, "Semua transaksi berhasil disimpan", Toast.LENGTH_SHORT).show()
+                            onSaved()
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Simpan Semua")
+                }
+                Spacer(Modifier.height(30.dp))
+            }
+            return@LazyColumn
+        }
+
+        if (mode == 3) {
+            item {
+                Button(
+                    onClick = {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
+                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Contoh: beli makan 25000 hari ini kategori makanan")
+                            }
+                            voiceLauncher.launch(intent)
+                        } else {
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Mulai Voice Input")
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+
         item {
             Row(
                 modifier = Modifier
@@ -963,35 +1253,10 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
         }
 
 
-        // ========================== ICON PICKER ==========================
         item {
-            Text("Pilih Icon", fontWeight = FontWeight.SemiBold)
+            Text("Kategori", fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                icons.forEach { (key, vector) ->
-                    Icon(
-                        imageVector = vector,
-                        contentDescription = null,
-                        tint = if (selectedIcon == key) MaterialTheme.colorScheme.primary else Color.Gray,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (selectedIcon == key)
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-                                else
-                                    Color.Transparent
-                            )
-                            .padding(8.dp)
-                            .clickable { selectedIcon = key }
-                    )
-                }
-            }
-
+            CategoryPicker(selectedIcon = selectedIcon) { selectedIcon = it }
             Spacer(Modifier.height(24.dp))
         }
 
@@ -1026,6 +1291,49 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
             }
 
             Spacer(Modifier.height(30.dp))
+        }
+    }
+}
+
+@Composable
+fun FilterButton(text: String, selected: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
+        )
+    ) {
+        Text(text)
+    }
+}
+
+@Composable
+fun CategoryPicker(selectedIcon: String, onSelected: (String) -> Unit) {
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        transactionCategories.forEach { category ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .width(72.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        if (selectedIcon == category.key) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                        else MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                    .clickable { onSelected(category.key) }
+                    .padding(8.dp)
+            ) {
+                Icon(
+                    imageVector = category.icon,
+                    contentDescription = category.label,
+                    tint = if (selectedIcon == category.key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(category.label, fontSize = 11.sp, textAlign = TextAlign.Center)
+            }
         }
     }
 }

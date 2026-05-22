@@ -2,12 +2,6 @@ package com.mycelengan
 
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Fastfood
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Train
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mycelengan.api.LaravelApi
 import com.mycelengan.pages.TransactionItem
@@ -63,14 +57,7 @@ class TransactionRepository {
     }
 
     fun iconFromName(name: String): ImageVector {
-        return when (name) {
-            "fastfood" -> Icons.Default.Fastfood
-            "shopping" -> Icons.Default.ShoppingCart
-            "train" -> Icons.Default.Train
-            "money" -> Icons.Default.AttachMoney
-            "edit" -> Icons.Default.Edit
-            else -> Icons.Default.Fastfood
-        }
+        return transactionCategoryIcon(name)
     }
 
     fun formatAmount(type: String, amount: Int): String {

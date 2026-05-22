@@ -56,6 +56,7 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.core:core-splashscreen:1.0.1")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     implementation(libs.androidx.runtime.livedata)
 
