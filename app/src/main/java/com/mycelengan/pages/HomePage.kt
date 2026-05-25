@@ -11,22 +11,20 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,30 +32,27 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.TrendingDown
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocalGroceryStore
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.filled.Train
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -65,90 +60,64 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FabPosition
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.material.icons.filled.CardGiftcard
-import androidx.compose.material.icons.filled.DirectionsCar
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.Flight
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Savings
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.SportsEsports
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.mycelengan.AuthState
 import com.mycelengan.AuthViewModel
-import com.mycelengan.R
 import com.mycelengan.ReceiptParser
 import com.mycelengan.TransactionDraft
 import com.mycelengan.VoiceTransactionParser
-import com.mycelengan.pages.HomeElement.CustomProgressBar
+import com.mycelengan.pages.HomeElement.FinanceChart
+import com.mycelengan.pages.HomeElement.MainBottomBar
 import com.mycelengan.transactionCategories
 import com.mycelengan.transactionCategoryIcon
 import com.mycelengan.ui.theme.bluelogo
 import com.mycelengan.ui.theme.colorExpense
 import com.mycelengan.ui.theme.colorIncome
-import com.mycelengan.ui.theme.expensePercent
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -164,114 +133,194 @@ fun HomePage(
     darkMode: Boolean,
     onDarkModeChange: (Boolean) -> Unit
 ) {
-    val authState = authViewModel.authState.observeAsState()
+val authState =
+    authViewModel
+        .authState
+        .observeAsState()
 
-    LaunchedEffect(authState.value) {
-        if (authState.value is AuthState.Unauthenticated) {
-            navController.navigate("login")
-        }
+LaunchedEffect(
+    authState.value
+) {
+
+    if (
+        authState.value
+                is AuthState
+        .Unauthenticated
+    ) {
+        navController.navigate(
+            "login"
+        )
+    }
+}
+
+val pagerState =
+    rememberPagerState(
+        initialPage = 0
+    ) {
+        4
     }
 
-    val navItemList = listOf(
-        NavItem("Home", Icons.Default.Home),
-        NavItem("Target", Icons.Default.AccountBalanceWallet),
-        NavItem("Pengaturan", Icons.Default.Settings)
+val scope =
+    rememberCoroutineScope()
+
+var openSheet by remember {
+    mutableStateOf(false)
+}
+
+var drawerMode by remember {
+    mutableIntStateOf(0)
+}
+
+val sheetState =
+    rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
     )
 
-    // ==========================
-    //  SETUP PAGER
-    // ==========================
-    val pagerState = rememberPagerState(initialPage = 0) { 3 }
-    val scope = rememberCoroutineScope()
+if (
+    openSheet
+) {
 
-    var openSheet by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
 
-    if (openSheet) {
-        ModalBottomSheet(
-            sheetState = sheetState,
-            onDismissRequest = { openSheet = false }
+        sheetState =
+            sheetState,
+
+        onDismissRequest = {
+            openSheet = false
+        }
+
+    ) {
+
+        DrawerHome(
+
+            authViewModel =
+                authViewModel,
+
+            initialMode =
+                drawerMode
+
         ) {
-            when (pagerState.currentPage) {
-                0 -> DrawerHome(authViewModel) { openSheet = false }
-                1 -> DrawerTarget(
-                    authViewModel = authViewModel,
-                    onSaved = { openSheet = false }
-                )
-            }
-        }
-    }
 
-    Scaffold(
-        topBar = {
-            when (pagerState.currentPage) {
-                0 -> TopAppBar(title = { Text("MyCelengan", fontWeight = FontWeight.Bold) })
-                1 -> TopAppBar(title = { Text("Target", fontWeight = FontWeight.Bold) })
-                2 -> TopAppBar(title = { Text("Pengaturan", fontWeight = FontWeight.Bold) })
-            }
-        },
-        bottomBar = {
-            NavigationBar(
-                containerColor = MaterialTheme.colorScheme.background
-            ) {
-                navItemList.forEachIndexed { index, navItem ->
-                    NavigationBarItem(
-                        selected = pagerState.currentPage == index,
-                        onClick = {
-                            scope.launch {
-                                pagerState.animateScrollToPage(index) // ⬅ geser halus
-                            }
-                        },
-                        icon = { Icon(navItem.icon, contentDescription = navItem.label) },
-                        label = { Text(navItem.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            indicatorColor = bluelogo
-                        )
-                    )
-                }
-            }
-        },
-        floatingActionButton = {
-            if (pagerState.currentPage != 2) {
-                FloatingActionButton(
-                    onClick = { openSheet = true },
-                    containerColor = bluelogo,
-                    contentColor = MaterialTheme.colorScheme.onBackground
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "add")
-                }
-            }
-        }
-    ) { innerPadding ->
-
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.padding(innerPadding)
-        ) { page ->
-
-            when (page) {
-                0 -> HomeContent(
-                    modifier = Modifier.fillMaxSize(),
-                    authViewModel = authViewModel
-                )
-
-                1 -> TargetPage(
-                    modifier = Modifier.fillMaxSize(),
-                    navController = navController,
-                    authViewModel = authViewModel
-                )
-
-                2 -> PengaturanPage(
-                    modifier = Modifier.fillMaxSize(),
-                    navController = navController,
-                    authViewModel = authViewModel,
-                    darkMode = darkMode,
-                    onDarkModeChange = onDarkModeChange
-                )
-            }
+            openSheet = false
         }
     }
 }
+
+        Scaffold(
+
+            topBar = {
+
+                val title =
+                    when (
+                        pagerState.currentPage
+                    ) {
+
+                        0 -> "MyCelengan"
+
+                        1 -> "Transaksi"
+
+                        2 -> "Target"
+
+                        else ->
+                            "Pengaturan"
+                    }
+
+                TopAppBar(
+                    title = {
+                        Text(
+                            title
+                        )
+                    }
+                )
+            },
+
+            bottomBar = {
+
+                MainBottomBar(
+
+                    selectedPage =
+                        pagerState.currentPage,
+
+                    onPageChange = {
+
+                        scope.launch {
+
+                            pagerState
+                                .animateScrollToPage(
+                                    it
+                                )
+                        }
+                    },
+
+                    onScanTap = {
+
+                        drawerMode = 1
+                        openSheet = true
+                    },
+
+                    onScanLongPress = {
+
+                        drawerMode = 3
+                        openSheet = true
+                    }
+                )
+            }
+
+        ) { padding ->
+
+            HorizontalPager(
+                state = pagerState,
+                modifier =
+                    modifier
+                        .padding(
+                            padding
+                        )
+            ) { page ->
+
+                when (
+                    page
+                ) {
+
+                    0 -> {
+
+                        HomeContent(
+                            modifier =
+                                Modifier.fillMaxSize(),
+                            authViewModel
+                        )
+                    }
+
+                    1 -> {
+
+                        TransaksiPage(
+                            Modifier.fillMaxSize()
+                        )
+                    }
+
+                    2 -> {
+
+                        TargetPage(
+                            Modifier.fillMaxSize(),
+                            navController,
+                            authViewModel
+                        )
+                    }
+
+                    3 -> {
+
+                        PengaturanPage(
+                            Modifier.fillMaxSize(),
+                            navController,
+                            authViewModel,
+                            darkMode,
+                            onDarkModeChange
+                        )
+                    }
+                }
+            }
+        }
+    }
+
 
 
 @Composable
@@ -283,7 +332,7 @@ fun HomeContent(
     val income = authViewModel.totalIncome.observeAsState(0)
     val expense = authViewModel.totalExpense.observeAsState(0)
     val transactions = authViewModel.transactions.observeAsState(emptyList())
-    var selectedTab by remember { mutableStateOf(0) }
+    var selectedTab by remember { mutableIntStateOf(0) }
     // 0 = semua, 1 = pemasukan, 2 = pengeluaran
 
     LazyColumn(
@@ -569,7 +618,17 @@ fun SaldoCardUI(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(
+                    Modifier.height(
+                        24.dp
+                    )
+                )
+
+                FinanceChart(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                )
 
                 Row(
                     modifier = Modifier
@@ -590,7 +649,7 @@ fun SaldoCardUI(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
-                                Icons.Default.TrendingUp,
+                                Icons.AutoMirrored.Filled.TrendingUp,
                                 contentDescription = null,
                                 tint = colorIncome,
                                 modifier = Modifier.size(28.dp)
@@ -627,7 +686,7 @@ fun SaldoCardUI(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
-                                Icons.Default.TrendingDown,
+                                Icons.AutoMirrored.Filled.TrendingDown,
                                 contentDescription = null,
                                 tint = colorExpense,
                                 modifier = Modifier.size(28.dp)
@@ -722,53 +781,6 @@ data class TransactionItem(
     val amountColor: Color
 )
 
-val transactionDummyList = listOf(
-    TransactionItem(
-        icon = Icons.Default.Fastfood,
-        title = "Makan Siang",
-        date = "12 Des 2023",
-        amount = "-Rp 50.000",
-        amountColor = colorExpense
-    ),
-    TransactionItem(
-        icon = Icons.Default.AttachMoney,
-        title = "Gaji Bulanan",
-        date = "1 Des 2023",
-        amount = "+Rp 5.000.000",
-        amountColor = colorIncome
-    ),
-    TransactionItem(
-        icon = Icons.Default.LocalGroceryStore,
-        title = "Belanja Bulanan",
-        date = "5 Des 2023",
-        amount = "-Rp 350.000",
-        amountColor = expensePercent
-    )
-)
-
-
-@Composable
-fun ContentScreen(
-    modifier: Modifier = Modifier,
-    selectedIndex: Int,
-    authViewModel: AuthViewModel,
-    navController: NavController,
-    darkMode: Boolean,
-    onDarkModeChange: (Boolean) -> Unit
-) {
-    when (selectedIndex) {
-        0 -> HomeContent(modifier = modifier, authViewModel)
-        1 -> TargetPage(modifier = modifier, navController, authViewModel)
-        2 -> PengaturanPage(
-            modifier = modifier,
-            navController,
-            authViewModel,
-            darkMode = darkMode,
-            onDarkModeChange = onDarkModeChange
-        )
-    }
-}
-
 fun formatRupiah(input: String): String {
     return input.reversed()
         .chunked(3)
@@ -779,9 +791,13 @@ fun formatRupiah(input: String): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
-    var mode by rememberSaveable { mutableStateOf(0) } // 0 manual, 1 scan, 2 banyak, 3 voice
-    var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 pengeluaran, 1 pemasukan
+fun DrawerHome(
+    authViewModel: AuthViewModel,
+    initialMode: Int = 0,
+    onSaved: () -> Unit
+) {
+    var mode by rememberSaveable { mutableIntStateOf(initialMode) } // 0 manual, 1 scan, 2 banyak, 3 voice
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 pengeluaran, 1 pemasukan
     var amount by rememberSaveable { mutableStateOf("") }
     var desc by rememberSaveable { mutableStateOf("") }
     var date by rememberSaveable { mutableStateOf("") }
@@ -1426,7 +1442,9 @@ fun CategoryDropdown(
                 ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
             },
             modifier = Modifier
-                .menuAnchor()
+                .menuAnchor(type =
+                    MenuAnchorType.PrimaryNotEditable,
+                    enabled = true)
                 .fillMaxWidth()
         )
 
@@ -1738,59 +1756,15 @@ private fun DateTextFieldForBulk(
 
 // CategoryPicker lama tetap disediakan supaya komponen lama tidak hilang.
 // Manual form dan bulk form sekarang memakai CategoryDropdown agar user tidak perlu melihat grid panjang.
-@Composable
-fun CategoryPicker(selectedIcon: String, onSelected: (String) -> Unit) {
-    FlowRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        transactionCategories.forEach { category ->
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .width(72.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (selectedIcon == category.key) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                        else MaterialTheme.colorScheme.surfaceContainerLow
-                    )
-                    .clickable { onSelected(category.key) }
-                    .padding(8.dp)
-            ) {
-                Icon(
-                    imageVector = category.icon,
-                    contentDescription = category.label,
-                    tint = if (selectedIcon == category.key) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(category.label, fontSize = 11.sp, textAlign = TextAlign.Center)
-            }
-        }
-    }
-}
-
 private fun Modifier.formWidth(): Modifier {
     return this
         .widthIn(max = 560.dp)
         .fillMaxWidth()
 }
 
-
-@Composable
-fun FilterButton(text: String, selected: Boolean, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
-        )
-    ) {
-        Text(text)
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("unused")
 fun DrawerTarget(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 
     var name by remember { mutableStateOf("") }
@@ -1949,15 +1923,21 @@ fun DrawerTarget(authViewModel: AuthViewModel, onSaved: () -> Unit) {
     }
 }
 
-
-
-
-data class NavItem(
-    val label: String,
-    val icon: ImageVector
-)
-
 fun formatDate(millis: Long): String {
-    val sdf = SimpleDateFormat("dd MMM yyyy", Locale("id", "ID"))
-    return sdf.format(Date(millis))
+
+    val locale =
+        Locale.Builder()
+            .setLanguage("id")
+            .setRegion("ID")
+            .build()
+
+    val sdf =
+        SimpleDateFormat(
+            "dd MMM yyyy",
+            locale
+        )
+
+    return sdf.format(
+        Date(millis)
+    )
 }

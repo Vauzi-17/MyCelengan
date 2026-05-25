@@ -17,46 +17,152 @@ fun MyAppNavigation(
     darkMode: Boolean,
     onDarkModeChange: (Boolean) -> Unit
 ) {
-    val navController = rememberNavController()
 
-    val profileViewModel: ProfileViewModel = viewModel()
+    val navController =
+        rememberNavController()
 
-    val userData by authViewModel.userData.observeAsState()
+    val profileViewModel:
+            ProfileViewModel =
+        viewModel()
 
-    val usernameNow = userData?.get("username") as? String ?: ""
-    val photoNow = userData?.get("photoUrl") as? String ?: "A"
+    val userData by
+    authViewModel
+        .userData
+        .observeAsState()
 
-    NavHost(navController = navController, startDestination = "welcome") {
+    val usernameNow =
+        userData
+            ?.get(
+                "username"
+            ) as? String
+            ?: ""
 
-        composable("login") {
-            LoginPage(modifier, navController, authViewModel)
+    val photoNow =
+        userData
+            ?.get(
+                "photoUrl"
+            ) as? String
+            ?: "A"
+
+    NavHost(
+
+        navController =
+            navController,
+
+        startDestination =
+            "welcome"
+
+    ) {
+
+        composable(
+            "welcome"
+        ) {
+
+            WelcomePage(
+                modifier,
+                navController,
+                authViewModel
+            )
         }
 
-        composable("signup") {
-            SignupPage(modifier, navController, authViewModel)
+        composable(
+            "login"
+        ) {
+
+            LoginPage(
+                modifier,
+                navController,
+                authViewModel
+            )
         }
 
-        composable("home") {
-            HomePage(modifier, navController, authViewModel,darkMode = darkMode,
-                onDarkModeChange = onDarkModeChange)
+        composable(
+            "signup"
+        ) {
+
+            SignupPage(
+                modifier,
+                navController,
+                authViewModel
+            )
         }
 
-        composable("pengaturan") {
-            PengaturanPage(modifier, navController, authViewModel, darkMode = darkMode, onDarkModeChange = onDarkModeChange)
+        composable(
+            "home"
+        ) {
+
+            HomePage(
+                modifier =
+                    modifier,
+
+                navController =
+                    navController,
+
+                authViewModel =
+                    authViewModel,
+
+                darkMode =
+                    darkMode,
+
+                onDarkModeChange =
+                    onDarkModeChange
+            )
         }
 
-        composable("akun") {
-            AccountSettingsScreen(modifier, navController, authViewModel, profileViewModel)
+        composable(
+            "pengaturan"
+        ) {
+
+            PengaturanPage(
+                modifier,
+                navController,
+                authViewModel,
+                darkMode,
+                onDarkModeChange
+            )
         }
 
-        composable("welcome") {
-            WelcomePage(modifier, navController, authViewModel)
+        composable(
+            "akun"
+        ) {
+
+            AccountSettingsScreen(
+
+                modifier =
+                    modifier,
+
+                navController =
+                    navController,
+
+                authViewModel =
+                    authViewModel,
+
+                profileViewModel =
+                    profileViewModel
+            )
         }
 
-        composable("targetDetail/{id}") { backStack ->
-            val id = backStack.arguments?.getString("id") ?: ""
-            TargetDetailPage(targetId = id, navController = navController, authViewModel)
-        }
+        composable(
+            "targetDetail/{id}"
+        ) {
 
+            val id =
+                it.arguments
+                    ?.getString(
+                        "id"
+                    )
+                    ?: ""
+
+            TargetDetailPage(
+
+                targetId =
+                    id,
+
+                navController =
+                    navController,
+
+                authViewModel
+            )
+        }
     }
 }
