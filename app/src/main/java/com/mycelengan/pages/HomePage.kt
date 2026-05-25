@@ -816,8 +816,38 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
             .onSuccess { image ->
                 recognizer.process(image)
                     .addOnSuccessListener { result ->
+
+                        // Rekonstruksi teks: pasangkan elemen satu baris
+                        // berdasarkan posisi Y yang berdekatan (toleransi 20px)
+                        val lineMap = mutableMapOf<Int, MutableList<Pair<Int, String>>>()
+
+                        result.textBlocks.forEach { block ->
+                            block.lines.forEach { line ->
+                                val centerY = line.boundingBox?.centerY() ?: return@forEach
+                                val centerX = line.boundingBox?.centerX() ?: 0
+
+                                // Cari bucket Y yang sudah ada dalam toleransi 20px
+                                val bucketY = lineMap.keys.firstOrNull {
+                                    kotlin.math.abs(it - centerY) < 20
+                                } ?: centerY
+
+                                lineMap.getOrPut(bucketY) { mutableListOf() }
+                                    .add(Pair(centerX, line.text))
+                            }
+                        }
+
+                        // Urutkan per baris (Y naik), lalu per kolom (X naik)
+                        // Gabungkan jadi string — satu baris Y = satu baris teks
+                        val reconstructedText = lineMap.entries
+                            .sortedBy { it.key }
+                            .joinToString("\n") { (_, items) ->
+                                items.sortedBy { it.first }
+                                    .joinToString(" ") { it.second }
+                            }
+
+
                         val parsed = ReceiptParser.parse(
-                            text = result.text,
+                            text = reconstructedText,
                             fallbackDate = formatDate(System.currentTimeMillis())
                         )
 
