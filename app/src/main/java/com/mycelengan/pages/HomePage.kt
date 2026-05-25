@@ -25,11 +25,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -50,6 +52,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalGroceryStore
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Train
@@ -62,6 +65,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
@@ -482,7 +489,7 @@ fun HomeContent(
                     showDeleteDialog = true
                 }
             )
-        }   
+        }
     }
 }
 
@@ -773,19 +780,19 @@ fun formatRupiah(input: String): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
-
-    var mode by remember { mutableStateOf(0) } // 0 manual, 1 scan, 2 banyak, 3 voice
-    var selectedTab by remember { mutableStateOf(0) } // 0 pengeluaran, 1 pemasukan
-    var amount by remember { mutableStateOf("") }
-    var desc by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
-    var selectedIcon by remember { mutableStateOf("food") }
-    var scanStatus by remember { mutableStateOf("") }
+    var mode by rememberSaveable { mutableStateOf(0) } // 0 manual, 1 scan, 2 banyak, 3 voice
+    var selectedTab by rememberSaveable { mutableStateOf(0) } // 0 pengeluaran, 1 pemasukan
+    var amount by rememberSaveable { mutableStateOf("") }
+    var desc by rememberSaveable { mutableStateOf("") }
+    var date by rememberSaveable { mutableStateOf("") }
+    var selectedIcon by rememberSaveable { mutableStateOf("food") }
+    var scanStatus by rememberSaveable { mutableStateOf("") }
     var receiptPreview by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+
     val bulkDrafts = remember { mutableStateListOf<TransactionDraft>() }
-    val rawAmount = amount.replace(".", "")
-    val isFormValid = rawAmount.isNotEmpty() && desc.isNotEmpty() && date.isNotEmpty()
+    val rawAmount = amount.replace(".", "").trim()
+    val isFormValid = rawAmount.isNotEmpty() && desc.isNotBlank() && date.isNotBlank()
     val context = LocalContext.current
     val recognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
@@ -794,7 +801,7 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
         amount = if (draft.amount > 0) formatRupiah(draft.amount.toString()) else ""
         desc = draft.desc
         date = draft.date.ifBlank { formatDate(System.currentTimeMillis()) }
-        selectedIcon = draft.icon
+        selectedIcon = draft.icon.ifBlank { "food" }
     }
 
     fun createReceiptUri(): Uri {
@@ -809,7 +816,11 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
             .onSuccess { image ->
                 recognizer.process(image)
                     .addOnSuccessListener { result ->
-                        val parsed = ReceiptParser.parse(result.text, formatDate(System.currentTimeMillis()))
+                        val parsed = ReceiptParser.parse(
+                            text = result.text,
+                            fallbackDate = formatDate(System.currentTimeMillis())
+                        )
+
                         if (parsed == null) {
                             scanStatus = "Struk belum terbaca. Coba foto lebih jelas."
                         } else {
@@ -849,14 +860,24 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
         else scanStatus = "Tidak ada gambar dipilih"
     }
 
+    fun buildVoiceIntent(): Intent {
+        return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Contoh: beli makan 25000 hari ini kategori makanan")
+        }
+    }
+
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val spoken = result.data
             ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             ?.firstOrNull()
+
         if (spoken.isNullOrBlank()) {
             Toast.makeText(context, "Voice tidak terbaca", Toast.LENGTH_SHORT).show()
             return@rememberLauncherForActivityResult
         }
+
         val parsed = VoiceTransactionParser.parse(spoken, formatDate(System.currentTimeMillis()))
         if (parsed == null) {
             Toast.makeText(context, "Nominal voice belum terbaca", Toast.LENGTH_SHORT).show()
@@ -869,20 +890,34 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 
     val audioPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
-                putExtra(RecognizerIntent.EXTRA_PROMPT, "Contoh: beli makan 25000 hari ini kategori makanan")
-            }
-            voiceLauncher.launch(intent)
+            voiceLauncher.launch(buildVoiceIntent())
         } else {
             Toast.makeText(context, "Izin mikrofon diperlukan untuk voice input", Toast.LENGTH_SHORT).show()
         }
     }
 
+    fun requestVoiceInput() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            voiceLauncher.launch(buildVoiceIntent())
+        } else {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    fun requestCameraScan() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            val uri = createReceiptUri()
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
     LaunchedEffect(Unit) {
-        if (date.isBlank()) {
-            date = formatDate(System.currentTimeMillis())
+        if (date.isBlank()) date = formatDate(System.currentTimeMillis())
+        if (bulkDrafts.isEmpty()) {
+            bulkDrafts.add(TransactionDraft(date = formatDate(System.currentTimeMillis()), icon = "food"))
         }
     }
 
@@ -890,180 +925,68 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .imePadding()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 30.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-
         item {
-            Text(
-                "Tambah Transaksi",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
+            DrawerHeader(
+                title = "Tambah Transaksi",
+                subtitle = "Catat manual, scan struk, input banyak, atau pakai voice."
             )
-            Spacer(Modifier.height(20.dp))
         }
 
         item {
-            val modes = listOf("Manual", "Scan Struk", "Banyak", "Voice")
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                modes.forEachIndexed { index, label ->
-                    OutlinedButton(
-                        onClick = { mode = index },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = if (mode == index) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
-                        )
-                    ) {
-                        Text(label)
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
+            ModeSelector(
+                selectedMode = mode,
+                onModeChange = { mode = it },
+                modifier = Modifier.formWidth()
+            )
+            Spacer(Modifier.height(14.dp))
         }
 
         if (mode == 1) {
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                                val uri = createReceiptUri()
-                                pendingCameraUri = uri
-                                cameraLauncher.launch(uri)
-                            } else {
-                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                            }
-                        }
-                    ) {
-                        Text("Kamera")
-                    }
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = {
-                            galleryLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        }
-                    ) {
-                        Text("Galeri")
-                    }
-                }
-                if (scanStatus.isNotBlank()) {
-                    Spacer(Modifier.height(10.dp))
-                    Text(scanStatus, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (receiptPreview.isNotEmpty()) {
-                    Spacer(Modifier.height(10.dp))
-                    Text("Preview item terbaca", fontWeight = FontWeight.SemiBold)
-                    receiptPreview.forEach {
-                        Text(it, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
+                ScanReceiptSection(
+                    scanStatus = scanStatus,
+                    receiptPreview = receiptPreview,
+                    onCameraClick = { requestCameraScan() },
+                    onGalleryClick = {
+                        galleryLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier.formWidth()
+                )
                 Spacer(Modifier.height(16.dp))
             }
         }
 
         if (mode == 2) {
             item {
-                if (bulkDrafts.isEmpty()) {
-                    bulkDrafts.add(TransactionDraft(date = formatDate(System.currentTimeMillis()), icon = "food"))
-                }
-
-                Text("Input Banyak Transaksi", fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-
-                bulkDrafts.forEachIndexed { index, draft ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLow)
-                    ) {
-                        Column(Modifier.padding(12.dp)) {
-                            var rowDesc by remember(draft) { mutableStateOf(draft.desc) }
-                            var rowAmount by remember(draft) {
-                                mutableStateOf(if (draft.amount > 0) formatRupiah(draft.amount.toString()) else "")
-                            }
-                            var rowDate by remember(draft) { mutableStateOf(draft.date.ifBlank { formatDate(System.currentTimeMillis()) }) }
-                            var rowType by remember(draft) { mutableStateOf(if (draft.type == "income") 1 else 0) }
-                            var rowIcon by remember(draft) { mutableStateOf(draft.icon.ifBlank { "food" }) }
-
-                            OutlinedTextField(
-                                value = rowDesc,
-                                onValueChange = {
-                                    rowDesc = it
-                                    bulkDrafts[index] = bulkDrafts[index].copy(desc = it)
-                                },
-                                label = { Text("Deskripsi") },
-                                modifier = Modifier.fillMaxWidth()
+                BulkTransactionSection(
+                    drafts = bulkDrafts,
+                    onDraftChange = { index, draft -> bulkDrafts[index] = draft },
+                    onAddRow = {
+                        bulkDrafts.add(
+                            TransactionDraft(
+                                date = date.ifBlank { formatDate(System.currentTimeMillis()) },
+                                type = if (selectedTab == 1) "income" else "expense",
+                                icon = selectedIcon
                             )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = rowAmount,
-                                onValueChange = {
-                                    val raw = it.replace(".", "")
-                                    if (raw.all(Char::isDigit)) {
-                                        rowAmount = if (raw.isBlank()) "" else formatRupiah(raw)
-                                        bulkDrafts[index] = bulkDrafts[index].copy(amount = raw.toIntOrNull() ?: 0)
-                                    }
-                                },
-                                label = { Text("Nominal") },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = rowDate,
-                                onValueChange = {
-                                    rowDate = it
-                                    bulkDrafts[index] = bulkDrafts[index].copy(date = it)
-                                },
-                                label = { Text("Tanggal") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterButton("Keluar", rowType == 0) {
-                                    rowType = 0
-                                    bulkDrafts[index] = bulkDrafts[index].copy(type = "expense")
-                                }
-                                FilterButton("Masuk", rowType == 1) {
-                                    rowType = 1
-                                    bulkDrafts[index] = bulkDrafts[index].copy(type = "income")
-                                }
-                            }
-                            Spacer(Modifier.height(8.dp))
-                            CategoryPicker(selectedIcon = rowIcon) {
-                                rowIcon = it
-                                bulkDrafts[index] = bulkDrafts[index].copy(icon = it)
-                            }
-                            TextButton(onClick = { bulkDrafts.removeAt(index) }) {
-                                Text("Hapus baris", color = colorExpense)
-                            }
-                        }
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        bulkDrafts.add(TransactionDraft(date = formatDate(System.currentTimeMillis()), icon = "food"))
+                        )
                     },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Tambah Baris")
-                }
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = {
+                    onRemoveRow = { index ->
+                        if (bulkDrafts.size > 1) bulkDrafts.removeAt(index)
+                    },
+                    onSaveAll = {
                         authViewModel.addTransactions(bulkDrafts.toList()) {
                             Toast.makeText(context, "Semua transaksi berhasil disimpan", Toast.LENGTH_SHORT).show()
                             onSaved()
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Simpan Semua")
-                }
+                    modifier = Modifier.formWidth()
+                )
                 Spacer(Modifier.height(30.dp))
             }
             return@LazyColumn
@@ -1071,223 +994,100 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 
         if (mode == 3) {
             item {
-                Button(
-                    onClick = {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
-                                putExtra(RecognizerIntent.EXTRA_PROMPT, "Contoh: beli makan 25000 hari ini kategori makanan")
-                            }
-                            voiceLauncher.launch(intent)
-                        } else {
-                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Mulai Voice Input")
-                }
+                VoiceInputCard(
+                    onVoiceClick = { requestVoiceInput() },
+                    modifier = Modifier.formWidth()
+                )
                 Spacer(Modifier.height(16.dp))
             }
         }
 
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly
+            Card(
+                modifier = Modifier.formWidth(),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                )
             ) {
-
-                Text(
-                    text = "Pengeluaran",
+                Column(
                     modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (selectedTab == 0) colorExpense.copy(alpha = 0.15f)
-                            else Color.Transparent,
-                            RoundedCornerShape(10.dp)
-                        )
-                        .padding(vertical = 10.dp)
-                        .clickable {
-                            selectedTab = 0
-                        },
-                    textAlign = TextAlign.Center,
-                    color = if (selectedTab == 0) colorExpense else Color.Gray,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Text(
-                    text = "Pemasukan",
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (selectedTab == 1) colorIncome.copy(alpha = 0.15f)
-                            else Color.Transparent,
-                            RoundedCornerShape(10.dp)
-                        )
-                        .padding(vertical = 10.dp)
-                        .clickable {
-                            selectedTab = 1
-                        },
-                    textAlign = TextAlign.Center,
-                    color = if (selectedTab == 1) colorIncome else Color.Gray,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-
-            Spacer(Modifier.height(20.dp))
-        }
-
-        // ========================== AMOUNT ==========================
-        // ========================== AMOUNT ==========================
-        item {
-
-            var isError by remember { mutableStateOf(false) }
-
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { newValue ->
-
-                    val raw = newValue.replace(".", "")
-
-                    if (raw.isEmpty()) {
-                        amount = ""
-                        isError = false
-                        return@OutlinedTextField
-                    }
-
-                    if (raw.all { it.isDigit() }) {
-                        isError = false
-                        amount = formatRupiah(raw)   // tetap format
-                    } else {
-                        isError = true
-                        Toast.makeText(context, "Hanya angka!", Toast.LENGTH_SHORT).show()
-                    }
-                },
-                label = {
-                    Text(
-                        if (selectedTab == 0) "Jumlah Pengeluaran"
-                        else "Jumlah Pemasukan"
-                    )
-                },
-                leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
-                isError = isError,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(16.dp))
-        }
-
-
-        // ========================== DESCRIPTION ==========================
-        item {
-            OutlinedTextField(
-                value = desc,
-                onValueChange = { desc = it },
-                label = { Text("Deskripsi") },
-                leadingIcon = { Icon(Icons.Default.Info, null) },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(16.dp))
-        }
-
-        item {
-            var showDatePicker by remember { mutableStateOf(false) }
-            val todayMillis = System.currentTimeMillis()
-            val datePickerState = rememberDatePickerState(initialSelectedDateMillis = todayMillis)
-
-            LaunchedEffect(Unit) {
-                if (date.isBlank()) {
-                    date = formatDate(todayMillis)
-                }
-            }
-
-            OutlinedTextField(
-                value = date,
-                onValueChange = { date = it },
-                label = { Text("Tanggal") },
-                readOnly = true,
-                modifier = Modifier.fillMaxWidth(),
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.CalendarMonth,
-                        contentDescription = null,
-                        modifier = Modifier.clickable {
-                            showDatePicker = true
-                        }
-                    )
-                }
-            )
-
-            if (showDatePicker) {
-                DatePickerDialog(
-                    onDismissRequest = { showDatePicker = false },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            val millis = datePickerState.selectedDateMillis
-                            if (millis != null) {
-                                date = formatDate(millis)
-                            }
-                            showDatePicker = false
-                        }) {
-                            Text("Pilih")
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDatePicker = false }) {
-                            Text("Batal")
-                        }
-                    }
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    DatePicker(state = datePickerState)
-                }
-            }
-
-
-            Spacer(Modifier.height(16.dp))
-        }
-
-
-        item {
-            Text("Kategori", fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(8.dp))
-            CategoryPicker(selectedIcon = selectedIcon) { selectedIcon = it }
-            Spacer(Modifier.height(24.dp))
-        }
-
-        // ========================== SUBMIT BUTTON ==========================
-        item {
-            Button(
-                onClick = {
-                    val rawAmount = amount.replace(".", "").trim()
-
-                    authViewModel.addTransaction(
-                        amount = rawAmount.toInt(),   // ✔ aman
-                        desc = desc,
-                        date = date,
-                        type = if (selectedTab == 1) "income" else "expense",
-                        iconName = selectedIcon
+                    TransactionTypeSelector(
+                        selectedTab = selectedTab,
+                        onSelected = { selectedTab = it }
                     )
 
-                    Toast.makeText(context, "Berhasil disimpan!", Toast.LENGTH_SHORT).show()
-                    onSaved() // menutup drawer
-                },
+                    AmountField(
+                        amount = amount,
+                        selectedTab = selectedTab,
+                        onAmountChange = { amount = it },
+                        onVoiceClick = { requestVoiceInput() }
+                    )
 
-                enabled = isFormValid,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isFormValid) bluelogo else Color.Gray
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    if (selectedTab == 0) "Simpan Pengeluaran"
-                    else "Simpan Pemasukan"
-                )
+                    QuickAmountChips(
+                        onAmountSelected = { amount = formatRupiah(it.toString()) }
+                    )
+
+                    OutlinedTextField(
+                        value = desc,
+                        onValueChange = { desc = it },
+                        label = { Text("Deskripsi") },
+                        placeholder = { Text("Contoh: Makan siang, gaji, bensin") },
+                        leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
+                        trailingIcon = {
+                            IconButton(onClick = { requestVoiceInput() }) {
+                                Icon(Icons.Default.Mic, contentDescription = "Isi dengan voice")
+                            }
+                        },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    DatePickerField(
+                        date = date,
+                        onDateSelected = { date = it }
+                    )
+
+                    CategoryDropdown(
+                        selectedIcon = selectedIcon,
+                        onSelected = { selectedIcon = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Button(
+                        onClick = {
+                            val safeAmount = amount.replace(".", "").trim().toIntOrNull() ?: 0
+
+                            authViewModel.addTransaction(
+                                amount = safeAmount,
+                                desc = desc.trim(),
+                                date = date,
+                                type = if (selectedTab == 1) "income" else "expense",
+                                iconName = selectedIcon
+                            )
+
+                            Toast.makeText(context, "Berhasil disimpan!", Toast.LENGTH_SHORT).show()
+                            onSaved()
+                        },
+                        enabled = isFormValid,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isFormValid) bluelogo else Color.Gray
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                    ) {
+                        Text(
+                            if (selectedTab == 0) "Simpan Pengeluaran"
+                            else "Simpan Pemasukan",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
 
             Spacer(Modifier.height(30.dp))
@@ -1296,17 +1096,618 @@ fun DrawerHome(authViewModel: AuthViewModel, onSaved: () -> Unit) {
 }
 
 @Composable
-fun FilterButton(text: String, selected: Boolean, onClick: () -> Unit) {
-    OutlinedButton(
-        onClick = onClick,
-        colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
-        )
+private fun DrawerHeader(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .formWidth()
+            .padding(top = 4.dp, bottom = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text)
+        Box(
+            modifier = Modifier
+                .width(42.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(100.dp))
+                .background(MaterialTheme.colorScheme.outlineVariant)
+        )
+        Spacer(Modifier.height(18.dp))
+        Text(title, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
+@Composable
+private fun ModeSelector(
+    selectedMode: Int,
+    onModeChange: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val modes = listOf(
+        "Manual" to Icons.Default.Edit,
+        "Scan" to Icons.Default.Image,
+        "Banyak" to Icons.Default.Add,
+        "Voice" to Icons.Default.Mic
+    )
+
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        modes.forEachIndexed { index, item ->
+            val selected = selectedMode == index
+            OutlinedButton(
+                onClick = { onModeChange(index) },
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
+                ),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Icon(
+                    imageVector = item.second,
+                    contentDescription = null,
+                    modifier = Modifier.size(17.dp),
+                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = item.first,
+                    fontSize = 13.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransactionTypeSelector(
+    selectedTab: Int,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        TypeTab(
+            text = "Pengeluaran",
+            selected = selectedTab == 0,
+            color = colorExpense,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelected(0) }
+        )
+        TypeTab(
+            text = "Pemasukan",
+            selected = selectedTab == 1,
+            color = colorIncome,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelected(1) }
+        )
+    }
+}
+
+@Composable
+private fun TypeTab(
+    text: String,
+    selected: Boolean,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Text(
+        text = text,
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) color.copy(alpha = 0.15f) else Color.Transparent
+            )
+            .clickable(onClick = onClick)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        textAlign = TextAlign.Center,
+        color = if (selected) color else MaterialTheme.colorScheme.onSurfaceVariant,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp
+    )
+}
+
+@Composable
+private fun AmountField(
+    amount: String,
+    selectedTab: Int,
+    onAmountChange: (String) -> Unit,
+    onVoiceClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isError by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    OutlinedTextField(
+        value = amount,
+        onValueChange = { newValue ->
+            val raw = newValue.replace(".", "").trim()
+
+            when {
+                raw.isEmpty() -> {
+                    isError = false
+                    onAmountChange("")
+                }
+                raw.all(Char::isDigit) -> {
+                    isError = false
+                    onAmountChange(formatRupiah(raw))
+                }
+                else -> {
+                    isError = true
+                    Toast.makeText(context, "Hanya angka!", Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
+        label = {
+            Text(
+                if (selectedTab == 0) "Jumlah Pengeluaran"
+                else "Jumlah Pemasukan"
+            )
+        },
+        placeholder = { Text("0") },
+        supportingText = {
+            if (isError) Text("Nominal hanya boleh angka")
+            else Text("Titik ribuan akan otomatis ditambahkan")
+        },
+        leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) },
+        trailingIcon = {
+            IconButton(onClick = onVoiceClick) {
+                Icon(Icons.Default.Mic, contentDescription = "Isi nominal dengan voice")
+            }
+        },
+        isError = isError,
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun QuickAmountChips(
+    onAmountSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val quickAmounts = listOf(
+        "10rb" to 10_000,
+        "25rb" to 25_000,
+        "50rb" to 50_000,
+        "100rb" to 100_000
+    )
+
+    FlowRow(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        quickAmounts.forEach { (label, value) ->
+            OutlinedButton(
+                onClick = { onAmountSelected(value) },
+                shape = RoundedCornerShape(100.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(label, fontSize = 12.sp)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DatePickerField(
+    date: String,
+    onDateSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    val todayMillis = System.currentTimeMillis()
+    val datePickerState = rememberDatePickerState(initialSelectedDateMillis = todayMillis)
+
+    OutlinedTextField(
+        value = date,
+        onValueChange = { },
+        label = { Text("Tanggal") },
+        placeholder = { Text(formatDate(todayMillis)) },
+        readOnly = true,
+        leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+        trailingIcon = {
+            TextButton(onClick = { showDatePicker = true }) {
+                Text("Pilih")
+            }
+        },
+        supportingText = {
+            Text("Default hari ini. Tekan Pilih untuk mengganti tanggal.")
+        },
+        modifier = modifier.fillMaxWidth()
+    )
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            onDateSelected(formatDate(millis))
+                        }
+                        showDatePicker = false
+                    }
+                ) {
+                    Text("Pilih")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Batal")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CategoryDropdown(
+    selectedIcon: String,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val selectedCategory = transactionCategories.firstOrNull { it.key == selectedIcon }
+        ?: transactionCategories.first()
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = selectedCategory.label,
+            onValueChange = { },
+            readOnly = true,
+            label = { Text("Kategori") },
+            leadingIcon = {
+                Icon(
+                    imageVector = selectedCategory.icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            transactionCategories.forEach { category ->
+                DropdownMenuItem(
+                    text = { Text(category.label) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = category.icon,
+                            contentDescription = null,
+                            tint = if (category.key == selectedIcon) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    onClick = {
+                        onSelected(category.key)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScanReceiptSection(
+    scanStatus: String,
+    receiptPreview: List<String>,
+    onCameraClick: () -> Unit,
+    onGalleryClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("Scan Struk", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            Text(
+                "Foto atau pilih gambar struk. Hasilnya akan otomatis masuk ke form manual.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = onCameraClick
+                ) {
+                    Text("Kamera")
+                }
+
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = onGalleryClick
+                ) {
+                    Text("Galeri")
+                }
+            }
+
+            if (scanStatus.isNotBlank()) {
+                Text(
+                    text = scanStatus,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            if (receiptPreview.isNotEmpty()) {
+                HorizontalDivider()
+                Text("Preview item terbaca", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                receiptPreview.take(5).forEach {
+                    Text("• $it", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (receiptPreview.size > 5) {
+                    Text(
+                        "+${receiptPreview.size - 5} item lainnya",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceInputCard(
+    onVoiceClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Voice Input", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+            }
+
+            Text(
+                "Ucapkan transaksi sekali saja, misalnya: beli makan 25000 hari ini kategori makanan.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Button(
+                onClick = onVoiceClick,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Mulai Voice Input")
+            }
+        }
+    }
+}
+
+@Composable
+private fun BulkTransactionSection(
+    drafts: MutableList<TransactionDraft>,
+    onDraftChange: (Int, TransactionDraft) -> Unit,
+    onAddRow: () -> Unit,
+    onRemoveRow: (Int) -> Unit,
+    onSaveAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isBulkValid = drafts.isNotEmpty() && drafts.all {
+        it.amount > 0 && it.desc.isNotBlank() && it.date.isNotBlank()
+    }
+
+    Column(modifier = modifier) {
+        Text("Input Banyak Transaksi", fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Cocok untuk mencatat banyak transaksi kecil. Tanggal, tipe, dan kategori bisa dipilih cepat.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+
+        drafts.forEachIndexed { index, draft ->
+            BulkTransactionCard(
+                index = index,
+                draft = draft,
+                canRemove = drafts.size > 1,
+                onDraftChange = { updated -> onDraftChange(index, updated) },
+                onRemove = { onRemoveRow(index) }
+            )
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = onAddRow,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Tambah Baris")
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Button(
+            onClick = onSaveAll,
+            enabled = isBulkValid,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (isBulkValid) bluelogo else Color.Gray
+            )
+        ) {
+            Text("Simpan Semua", fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun BulkTransactionCard(
+    index: Int,
+    draft: TransactionDraft,
+    canRemove: Boolean,
+    onDraftChange: (TransactionDraft) -> Unit,
+    onRemove: () -> Unit
+) {
+    val rowAmount = if (draft.amount > 0) formatRupiah(draft.amount.toString()) else ""
+    val rowType = if (draft.type == "income") 1 else 0
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Transaksi ${index + 1}",
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                if (canRemove) {
+                    TextButton(onClick = onRemove) {
+                        Text("Hapus", color = colorExpense)
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = draft.desc,
+                onValueChange = { onDraftChange(draft.copy(desc = it)) },
+                label = { Text("Deskripsi") },
+                placeholder = { Text("Contoh: Es teh, parkir, bensin") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            OutlinedTextField(
+                value = rowAmount,
+                onValueChange = { value ->
+                    val raw = value.replace(".", "").trim()
+                    if (raw.all(Char::isDigit)) {
+                        onDraftChange(draft.copy(amount = raw.toIntOrNull() ?: 0))
+                    }
+                },
+                label = { Text("Nominal") },
+                placeholder = { Text("0") },
+                leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            DateTextFieldForBulk(
+                date = draft.date.ifBlank { formatDate(System.currentTimeMillis()) },
+                onDateChange = { onDraftChange(draft.copy(date = it)) }
+            )
+
+            TransactionTypeSelector(
+                selectedTab = rowType,
+                onSelected = { selected ->
+                    onDraftChange(draft.copy(type = if (selected == 1) "income" else "expense"))
+                }
+            )
+
+            CategoryDropdown(
+                selectedIcon = draft.icon.ifBlank { "food" },
+                onSelected = { onDraftChange(draft.copy(icon = it)) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun DateTextFieldForBulk(
+    date: String,
+    onDateChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = date,
+        onValueChange = onDateChange,
+        label = { Text("Tanggal") },
+        placeholder = { Text(formatDate(System.currentTimeMillis())) },
+        leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
+        singleLine = true,
+        supportingText = { Text("Default hari ini. Bisa disamakan untuk semua baris.") },
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+// CategoryPicker lama tetap disediakan supaya komponen lama tidak hilang.
+// Manual form dan bulk form sekarang memakai CategoryDropdown agar user tidak perlu melihat grid panjang.
 @Composable
 fun CategoryPicker(selectedIcon: String, onSelected: (String) -> Unit) {
     FlowRow(
@@ -1330,7 +1731,8 @@ fun CategoryPicker(selectedIcon: String, onSelected: (String) -> Unit) {
                 Icon(
                     imageVector = category.icon,
                     contentDescription = category.label,
-                    tint = if (selectedIcon == category.key) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = if (selectedIcon == category.key) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(category.label, fontSize = 11.sp, textAlign = TextAlign.Center)
             }
@@ -1338,6 +1740,24 @@ fun CategoryPicker(selectedIcon: String, onSelected: (String) -> Unit) {
     }
 }
 
+private fun Modifier.formWidth(): Modifier {
+    return this
+        .widthIn(max = 560.dp)
+        .fillMaxWidth()
+}
+
+
+@Composable
+fun FilterButton(text: String, selected: Boolean, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
+        )
+    ) {
+        Text(text)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
