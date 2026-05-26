@@ -123,6 +123,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.mycelengan.pages.HomeElement.calculateFinanceInsight
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -332,6 +333,54 @@ fun HomeContent(
     val income = authViewModel.totalIncome.observeAsState(0)
     val expense = authViewModel.totalExpense.observeAsState(0)
     val transactions = authViewModel.transactions.observeAsState(emptyList())
+    val expenseChart =
+
+        transactions.value
+
+            .filter {
+
+                it["type"] ==
+                        "expense"
+
+            }
+
+            .takeLast(6)
+
+            .map {
+
+                (
+                        it["amount"]
+                            ?.toString()
+                            ?.toFloatOrNull()
+
+                            ?: 0f
+
+                        )
+
+            }
+
+            .let {
+
+                if(
+                    it.isEmpty()
+                )
+
+                    emptyList()
+
+                else {
+
+                    val max =
+                        it.maxOrNull()
+                            ?: 1f
+
+                    it.map {
+
+                            value ->
+
+                        value / max
+                    }
+                }
+            }
     var selectedTab by remember { mutableIntStateOf(0) }
     // 0 = semua, 1 = pemasukan, 2 = pengeluaran
 
@@ -343,9 +392,17 @@ fun HomeContent(
     ) {
         item {
             SaldoCardUI(
-                saldo = saldo.value,
-                income = income.value,
-                expense = expense.value
+                saldo =
+                    saldo.value,
+
+                income =
+                    income.value,
+
+                expense =
+                    expense.value,
+
+                chartValues =
+                    expenseChart
             )
         }
 
@@ -554,9 +611,11 @@ fun formatRupiahStr(value: String): String {
 
 @Composable
 fun SaldoCardUI(
-    saldo: Int,
-    income: Int,
-    expense: Int
+    saldo:Int,
+    income:Int,
+    expense:Int,
+    chartValues:
+    List<Float>
 ) {
     Card(
         modifier = Modifier
@@ -627,7 +686,10 @@ fun SaldoCardUI(
                 FinanceChart(
                     modifier =
                         Modifier
-                            .fillMaxWidth()
+                            .fillMaxWidth(),
+
+                    values =
+                        chartValues
                 )
 
                 Row(
@@ -707,6 +769,80 @@ fun SaldoCardUI(
                                 textAlign = TextAlign.Center
                             )
                         }
+                    }
+                }
+                Spacer(
+                    Modifier.height(
+                        18.dp
+                    )
+                )
+
+                val insight =
+                    calculateFinanceInsight(
+                        income,
+                        expense
+                    )
+
+                Card(
+
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(),
+
+                    shape =
+                        RoundedCornerShape(
+                            16.dp
+                        ),
+
+                    colors =
+                        CardDefaults.cardColors(
+
+                            containerColor =
+
+                                MaterialTheme
+                                    .colorScheme
+                                    .surface
+                        )
+
+                ) {
+
+                    Column(
+
+                        modifier =
+                            Modifier.padding(
+                                16.dp
+                            )
+
+                    ) {
+
+                        Text(
+
+                            text =
+                                "${insight.emoji} ${insight.title}",
+
+                            fontWeight =
+                                FontWeight.Bold,
+
+                            fontSize =
+                                15.sp
+                        )
+
+                        Spacer(
+                            Modifier.height(
+                                6.dp
+                            )
+                        )
+
+                        Text(
+
+                            text =
+                                insight.message,
+
+                            color =
+                                MaterialTheme
+                                    .colorScheme
+                                    .onSurfaceVariant
+                        )
                     }
                 }
             }
