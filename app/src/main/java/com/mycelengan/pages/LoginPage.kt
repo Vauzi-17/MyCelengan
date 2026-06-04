@@ -1,6 +1,7 @@
 package com.mycelengan.pages
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -12,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -25,7 +25,6 @@ import androidx.navigation.NavController
 import com.mycelengan.AuthState
 import com.mycelengan.AuthViewModel
 import com.mycelengan.R
-import com.mycelengan.ui.theme.bluelogo
 
 @Composable
 fun LoginPage(
@@ -68,25 +67,26 @@ fun LoginPage(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 24.dp)
             .imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
 
-        // LOGO + TITLE
+        // LOGO + JUDUL
         item {
             Icon(
                 painterResource(R.drawable.logo_out),
                 contentDescription = "logo",
                 modifier = Modifier.size(160.dp),
-                tint = bluelogo
+                tint = MaterialTheme.colorScheme.primary
             )
 
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Sign in to My Celengan",
+                text = "Masuk ke My Celengan",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -95,7 +95,7 @@ fun LoginPage(
             Spacer(Modifier.height(28.dp))
         }
 
-        // GOOGLE BUTTON
+        // TOMBOL GOOGLE
         item {
             OutlinedButton(
                 onClick = { },
@@ -113,14 +113,14 @@ fun LoginPage(
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(12.dp))
-                    Text("Sign in with Google", fontWeight = FontWeight.Bold)
+                    Text("Masuk dengan Google", fontWeight = FontWeight.Bold)
                 }
             }
 
             Spacer(Modifier.height(16.dp))
         }
 
-        // APPLE BUTTON
+        // TOMBOL APPLE
         item {
             OutlinedButton(
                 onClick = { },
@@ -138,27 +138,36 @@ fun LoginPage(
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(12.dp))
-                    Text("Sign in with Apple", fontWeight = FontWeight.Bold)
+                    Text("Masuk dengan Apple", fontWeight = FontWeight.Bold)
                 }
             }
 
             Spacer(Modifier.height(24.dp))
         }
 
-        // OR DIVIDER
+        // PEMBATAS
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Divider(modifier = Modifier.weight(1f))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
                 Spacer(Modifier.width(12.dp))
-                Text("Or")
+                Text(
+                    "Atau",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.width(12.dp))
-                Divider(modifier = Modifier.weight(1f))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
             }
 
             Spacer(Modifier.height(24.dp))
         }
 
-        // EMAIL FIELD
+        // FIELD EMAIL
         item {
             OutlinedTextField(
                 value = email,
@@ -172,7 +181,7 @@ fun LoginPage(
             Spacer(Modifier.height(16.dp))
         }
 
-        // PASSWORD FIELD
+        // FIELD PASSWORD
         item {
             OutlinedTextField(
                 value = password,
@@ -188,14 +197,14 @@ fun LoginPage(
                         )
                     }
                 },
-                label = { Text("Password") },
+                label = { Text("Kata sandi") },
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(24.dp))
         }
 
-        // LOGIN BUTTON
+        // TOMBOL MASUK
         item {
             Button(
                 onClick = {
@@ -204,18 +213,21 @@ fun LoginPage(
                 },
                 enabled = authState.value != AuthState.Loading,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(bluelogo)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
-                Text("Log in")
+                Text("Masuk")
             }
 
             Spacer(Modifier.height(16.dp))
         }
 
-        // SIGNUP LINK
+        // LINK DAFTAR
         item {
             TextButton(onClick = { navController.navigate("signup") }) {
-                Text("Don't have an account? Sign up")
+                Text("Belum punya akun? Daftar")
             }
 
             Spacer(Modifier.height(80.dp))

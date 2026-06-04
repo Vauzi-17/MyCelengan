@@ -1,5 +1,10 @@
 package com.mycelengan.pages
 
+import android.Manifest
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,10 +37,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,10 +56,35 @@ fun PengaturanPage(
     navController: NavController,
     authViewModel: AuthViewModel,
     darkMode: Boolean,
-    onDarkModeChange: (Boolean) -> Unit
+    onDarkModeChange: (Boolean) -> Unit,
+    notificationEnabled: Boolean,
+    onNotificationChange: (Boolean) -> Unit
 ) {
 
-    var notificationEnabled by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            onNotificationChange(granted)
+
+            Toast.makeText(
+                context,
+                if (granted) "Pengingat target diaktifkan" else "Izin notifikasi ditolak",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+
+    fun requestNotification(enabled: Boolean) {
+        if (!enabled) {
+            onNotificationChange(false)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            onNotificationChange(true)
+        }
+    }
 
     Column(
         modifier = modifier
@@ -88,7 +116,7 @@ fun PengaturanPage(
             title = "Notifikasi",
             subtitle = "Aktifkan push notifikasi",
             checked = notificationEnabled,
-            onCheckedChange = { notificationEnabled = it }
+            onCheckedChange = { requestNotification(it) }
         )
 
         SettingItem(

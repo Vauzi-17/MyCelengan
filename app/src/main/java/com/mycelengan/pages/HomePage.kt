@@ -17,10 +17,12 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +30,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,7 +44,6 @@ import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Edit
@@ -64,6 +66,8 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,7 +79,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -109,8 +112,13 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.mycelengan.AuthState
 import com.mycelengan.AuthViewModel
 import com.mycelengan.ReceiptParser
+import com.mycelengan.RupiahIcon
 import com.mycelengan.TransactionDraft
 import com.mycelengan.VoiceTransactionParser
+import com.mycelengan.formatRupiah
+import com.mycelengan.formatRupiahInput
+import com.mycelengan.formatSignedRupiah
+import com.mycelengan.parseRupiah
 import com.mycelengan.pages.HomeElement.FinanceChart
 import com.mycelengan.pages.HomeElement.MainBottomBar
 import com.mycelengan.transactionCategories
@@ -132,7 +140,9 @@ fun HomePage(
     navController: NavController,
     authViewModel: AuthViewModel,
     darkMode: Boolean,
-    onDarkModeChange: (Boolean) -> Unit
+    onDarkModeChange: (Boolean) -> Unit,
+    notificationEnabled: Boolean,
+    onNotificationChange: (Boolean) -> Unit
 ) {
 val authState =
     authViewModel
@@ -172,6 +182,10 @@ var drawerMode by remember {
     mutableIntStateOf(0)
 }
 
+var sheetMode by remember {
+    mutableStateOf("transaction")
+}
+
 val sheetState =
     rememberModalBottomSheetState(
         skipPartiallyExpanded = true
@@ -192,22 +206,33 @@ if (
 
     ) {
 
-        DrawerHome(
+        if (sheetMode == "target") {
+            DrawerTarget(
+                authViewModel =
+                    authViewModel
+            ) {
+                openSheet = false
+            }
+        } else {
+            DrawerHome(
 
-            authViewModel =
-                authViewModel,
+                authViewModel =
+                    authViewModel,
 
-            initialMode =
-                drawerMode
+                initialMode =
+                    drawerMode
 
-        ) {
+            ) {
 
-            openSheet = false
+                openSheet = false
+            }
         }
     }
 }
 
         Scaffold(
+            contentWindowInsets =
+                WindowInsets(0.dp),
 
             topBar = {
 
@@ -226,12 +251,9 @@ if (
                             "Pengaturan"
                     }
 
-                TopAppBar(
-                    title = {
-                        Text(
-                            title
-                        )
-                    }
+                CompactHomeTopBar(
+                    title =
+                        title
                 )
             },
 
@@ -255,17 +277,45 @@ if (
 
                     onScanTap = {
 
+                        sheetMode = "transaction"
                         drawerMode = 1
                         openSheet = true
                     },
 
                     onScanLongPress = {
 
+                        sheetMode = "transaction"
                         drawerMode = 3
                         openSheet = true
                     }
                 )
-            }
+            },
+
+            floatingActionButton = {
+
+                if (pagerState.currentPage == 2) {
+                    ExtendedFloatingActionButton(
+                        modifier = Modifier.padding(bottom = 12.dp),
+                        onClick = {
+                            sheetMode = "target"
+                            openSheet = true
+                        },
+                        icon = {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = null
+                            )
+                        },
+                        text = {
+                            Text("Target")
+                        },
+                        containerColor = bluelogo,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            },
+
+            floatingActionButtonPosition = FabPosition.End
 
         ) { padding ->
 
@@ -294,7 +344,8 @@ if (
                     1 -> {
 
                         TransaksiPage(
-                            Modifier.fillMaxSize()
+                            Modifier.fillMaxSize(),
+                            authViewModel
                         )
                     }
 
@@ -314,13 +365,37 @@ if (
                             navController,
                             authViewModel,
                             darkMode,
-                            onDarkModeChange
+                            onDarkModeChange,
+                            notificationEnabled,
+                            onNotificationChange
                         )
                     }
                 }
             }
         }
     }
+
+@Composable
+private fun CompactHomeTopBar(
+    title: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .height(48.dp)
+            .padding(horizontal = 20.dp),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Text(
+            text = title,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+    }
+}
 
 
 
@@ -329,22 +404,34 @@ fun HomeContent(
     modifier: Modifier = Modifier,
     authViewModel: AuthViewModel
 ) {
-    val saldo = authViewModel.saldo.observeAsState(0)
     val income = authViewModel.totalIncome.observeAsState(0)
     val expense = authViewModel.totalExpense.observeAsState(0)
     val transactions = authViewModel.transactions.observeAsState(emptyList())
-    val expenseChart =
+    val calculatedIncome =
+        transactions.value
+            .filter { it["type"] == "income" }
+            .sumOf { parseRupiah(it["amount"]) }
+    val calculatedExpense =
+        transactions.value
+            .filter { it["type"] == "expense" }
+            .sumOf { parseRupiah(it["amount"]) }
+    val displayIncome =
+        if (transactions.value.isEmpty()) income.value else calculatedIncome
+    val displayExpense =
+        if (transactions.value.isEmpty()) expense.value else calculatedExpense
+    val displaySaldo =
+        displayIncome - displayExpense
+    val chartTransactions =
 
         transactions.value
 
-            .filter {
+            .take(6)
 
-                it["type"] ==
-                        "expense"
+            .reversed()
 
-            }
+    val transactionChart =
 
-            .takeLast(6)
+        chartTransactions
 
             .map {
 
@@ -371,6 +458,7 @@ fun HomeContent(
 
                     val max =
                         it.maxOrNull()
+                            ?.coerceAtLeast(1f)
                             ?: 1f
 
                     it.map {
@@ -384,6 +472,21 @@ fun HomeContent(
     var selectedTab by remember { mutableIntStateOf(0) }
     // 0 = semua, 1 = pemasukan, 2 = pengeluaran
 
+    val transactionChartLabels =
+
+        chartTransactions
+
+            .mapIndexed { index, item ->
+
+                item["date"]
+                    ?.toString()
+                    ?.take(6)
+                    ?.ifBlank {
+                        null
+                    }
+                    ?: "${index + 1}"
+            }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -393,21 +496,38 @@ fun HomeContent(
         item {
             SaldoCardUI(
                 saldo =
-                    saldo.value,
-
-                income =
-                    income.value,
-
-                expense =
-                    expense.value,
-
-                chartValues =
-                    expenseChart
+                    displaySaldo
             )
         }
 
         item {
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
+            FinanceChart(
+                modifier = Modifier.fillMaxWidth(),
+                values = transactionChart,
+                labels = transactionChartLabels
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(12.dp))
+            IncomeExpenseCard(
+                income = displayIncome,
+                expense = displayExpense
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(12.dp))
+            FinanceInsightCard(
+                income = displayIncome,
+                expense = displayExpense,
+                saldo = displaySaldo
+            )
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(20.dp))
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = "Transaksi terbaru",
@@ -544,13 +664,8 @@ fun HomeContent(
 
         items(filteredTransactions) { item ->
 
-            val raw = item["amount"].toString()
-            val formattedAmount = formatRupiahStr(raw)
-
-            val finalAmount = if (item["type"] == "income")
-                "+Rp$formattedAmount"
-            else
-                "-Rp$formattedAmount"
+            val finalAmount =
+                formatSignedRupiah(item["type"].toString(), item["amount"])
 
             // State untuk dialog konfirmasi
             var showDeleteDialog by remember { mutableStateOf(false) }
@@ -565,7 +680,7 @@ fun HomeContent(
                         TextButton(
                             onClick = {
                                 val transactionId = item["id"].toString()
-                                val amount = item["amount"].toString().toIntOrNull() ?: 0
+                                val amount = parseRupiah(item["amount"])
                                 val type = item["type"].toString()
 
                                 authViewModel.deleteTransaction(transactionId, amount, type)
@@ -599,28 +714,20 @@ fun HomeContent(
     }
 }
 
-fun formatRupiahStr(value: String): String {
-    return value
-        .replace(".", "")
-        .reversed()
-        .chunked(3)
-        .joinToString(".")
-        .reversed()
-}
-
-
 @Composable
 fun SaldoCardUI(
-    saldo:Int,
-    income:Int,
-    expense:Int,
-    chartValues:
-    List<Float>
+    saldo:Int
 ) {
+    val saldoColor =
+        when {
+            saldo < 0 -> colorExpense
+            saldo > 0 -> colorIncome
+            else -> MaterialTheme.colorScheme.onBackground
+        }
+
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 16.dp),
+            .fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -666,186 +773,146 @@ fun SaldoCardUI(
                     border = BorderStroke(1.dp, bluelogo.copy(alpha = 0.3f))
                 ) {
                     Text(
-                        text = "Rp${formatRupiah(saldo.toString())}",
+                        text = formatRupiah(saldo),
                         fontSize = 40.sp,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground,
+                        color = saldoColor,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 16.dp),
                         textAlign = TextAlign.Center
                     )
                 }
-
-                Spacer(
-                    Modifier.height(
-                        24.dp
-                    )
-                )
-
-                FinanceChart(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth(),
-
-                    values =
-                        chartValues
-                )
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // pemasukan
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.background .copy(alpha = 0.1f)
-                        ),
-                        border = BorderStroke(1.dp, colorIncome.copy(alpha = 0.3f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.TrendingUp,
-                                contentDescription = null,
-                                tint = colorIncome,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = "Pemasukan",
-                                fontSize = 14.sp,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "Rp${formatRupiah(income.toString())}",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colorIncome,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-
-                    // pengeluaran
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.1f)
-                        ),
-                        border = BorderStroke(1.dp, colorExpense.copy(alpha = 0.3f))
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.TrendingDown,
-                                contentDescription = null,
-                                tint = colorExpense,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = "Pengeluaran",
-                                fontSize = 14.sp,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "Rp${formatRupiah(expense.toString())}",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colorExpense,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-                }
-                Spacer(
-                    Modifier.height(
-                        18.dp
-                    )
-                )
-
-                val insight =
-                    calculateFinanceInsight(
-                        income,
-                        expense
-                    )
-
-                Card(
-
-                    modifier =
-                        Modifier
-                            .fillMaxWidth(),
-
-                    shape =
-                        RoundedCornerShape(
-                            16.dp
-                        ),
-
-                    colors =
-                        CardDefaults.cardColors(
-
-                            containerColor =
-
-                                MaterialTheme
-                                    .colorScheme
-                                    .surface
-                        )
-
-                ) {
-
-                    Column(
-
-                        modifier =
-                            Modifier.padding(
-                                16.dp
-                            )
-
-                    ) {
-
-                        Text(
-
-                            text =
-                                "${insight.emoji} ${insight.title}",
-
-                            fontWeight =
-                                FontWeight.Bold,
-
-                            fontSize =
-                                15.sp
-                        )
-
-                        Spacer(
-                            Modifier.height(
-                                6.dp
-                            )
-                        )
-
-                        Text(
-
-                            text =
-                                insight.message,
-
-                            color =
-                                MaterialTheme
-                                    .colorScheme
-                                    .onSurfaceVariant
-                        )
-                    }
-                }
             }
+        }
+    }
+}
+
+@Composable
+private fun IncomeExpenseCard(
+    income: Int,
+    expense: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            MoneySummaryItem(
+                title = "Pemasukan",
+                amount = income,
+                icon = Icons.AutoMirrored.Filled.TrendingUp,
+                color = colorIncome,
+                modifier = Modifier.weight(1f)
+            )
+            MoneySummaryItem(
+                title = "Pengeluaran",
+                amount = expense,
+                icon = Icons.AutoMirrored.Filled.TrendingDown,
+                color = colorExpense,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MoneySummaryItem(
+    title: String,
+    amount: Int,
+    icon: ImageVector,
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = title,
+                fontSize = 14.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = formatRupiah(amount),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = color,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun FinanceInsightCard(
+    income: Int,
+    expense: Int,
+    saldo: Int
+) {
+    val baseInsight =
+        calculateFinanceInsight(
+            income,
+            expense
+        )
+    val title =
+        if (saldo < 0) "Saldo minus"
+        else baseInsight.title
+    val message =
+        if (saldo < 0) "Pengeluaran lebih besar dari pemasukan. Coba tambah pemasukan atau kurangi pengeluaran."
+        else baseInsight.message
+    val emoji =
+        if (saldo < 0) "!"
+        else baseInsight.emoji
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = "$emoji $title",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = if (saldo < 0) colorExpense else MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = message,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -917,14 +984,6 @@ data class TransactionItem(
     val amountColor: Color
 )
 
-fun formatRupiah(input: String): String {
-    return input.reversed()
-        .chunked(3)
-        .joinToString(".")
-        .reversed()
-}
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DrawerHome(
@@ -941,16 +1000,17 @@ fun DrawerHome(
     var scanStatus by rememberSaveable { mutableStateOf("") }
     var receiptPreview by remember { mutableStateOf<List<String>>(emptyList()) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingVoiceMode by rememberSaveable { mutableIntStateOf(0) }
 
     val bulkDrafts = remember { mutableStateListOf<TransactionDraft>() }
-    val rawAmount = amount.replace(".", "").trim()
-    val isFormValid = rawAmount.isNotEmpty() && desc.isNotBlank() && date.isNotBlank()
+    val rawAmount = parseRupiah(amount)
+    val isFormValid = rawAmount > 0 && desc.isNotBlank() && date.isNotBlank()
     val context = LocalContext.current
     val recognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
 
     fun applyDraft(draft: TransactionDraft) {
         selectedTab = if (draft.type == "income") 1 else 0
-        amount = if (draft.amount > 0) formatRupiah(draft.amount.toString()) else ""
+        amount = if (draft.amount > 0) formatRupiahInput(draft.amount) else ""
         desc = draft.desc
         date = draft.date.ifBlank { formatDate(System.currentTimeMillis()) }
         selectedIcon = draft.icon.ifBlank { "food" }
@@ -1042,11 +1102,19 @@ fun DrawerHome(
         else scanStatus = "Tidak ada gambar dipilih"
     }
 
+    fun voicePrompt(): String {
+        return when (pendingVoiceMode) {
+            1 -> "Sebutkan nominal saja. Contoh: dua puluh lima ribu"
+            2 -> "Sebutkan deskripsi transaksi. Contoh: makan siang"
+            else -> "Contoh: beli makan 25000 hari ini kategori makanan"
+        }
+    }
+
     fun buildVoiceIntent(): Intent {
         return Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "id-ID")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Contoh: beli makan 25000 hari ini kategori makanan")
+            putExtra(RecognizerIntent.EXTRA_PROMPT, voicePrompt())
         }
     }
 
@@ -1060,13 +1128,34 @@ fun DrawerHome(
             return@rememberLauncherForActivityResult
         }
 
-        val parsed = VoiceTransactionParser.parse(spoken, formatDate(System.currentTimeMillis()))
-        if (parsed == null) {
-            Toast.makeText(context, "Nominal voice belum terbaca", Toast.LENGTH_SHORT).show()
-        } else {
-            applyDraft(parsed)
-            mode = 0
-            Toast.makeText(context, "Voice masuk ke form. Silakan cek lagi.", Toast.LENGTH_SHORT).show()
+        when (pendingVoiceMode) {
+            1 -> {
+                val parsedAmount = VoiceTransactionParser.parseAmount(spoken)
+                if (parsedAmount == null) {
+                    Toast.makeText(context, "Nominal voice belum terbaca", Toast.LENGTH_SHORT).show()
+                } else {
+                    amount = formatRupiahInput(parsedAmount)
+                    Toast.makeText(context, "Nominal berhasil diisi", Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            2 -> {
+                desc = spoken
+                    .trim()
+                    .replaceFirstChar { it.uppercase() }
+                Toast.makeText(context, "Deskripsi berhasil diisi", Toast.LENGTH_SHORT).show()
+            }
+
+            else -> {
+                val parsed = VoiceTransactionParser.parse(spoken, formatDate(System.currentTimeMillis()))
+                if (parsed == null) {
+                    Toast.makeText(context, "Nominal voice belum terbaca", Toast.LENGTH_SHORT).show()
+                } else {
+                    applyDraft(parsed)
+                    mode = 0
+                    Toast.makeText(context, "Voice masuk ke form. Silakan cek lagi.", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
     }
 
@@ -1078,7 +1167,8 @@ fun DrawerHome(
         }
     }
 
-    fun requestVoiceInput() {
+    fun requestVoiceInput(voiceMode: Int = 0) {
+        pendingVoiceMode = voiceMode
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             voiceLauncher.launch(buildVoiceIntent())
         } else {
@@ -1177,7 +1267,7 @@ fun DrawerHome(
         if (mode == 3) {
             item {
                 VoiceInputCard(
-                    onVoiceClick = { requestVoiceInput() },
+                    onVoiceClick = { requestVoiceInput(0) },
                     modifier = Modifier.formWidth()
                 )
                 Spacer(Modifier.height(16.dp))
@@ -1207,11 +1297,11 @@ fun DrawerHome(
                         amount = amount,
                         selectedTab = selectedTab,
                         onAmountChange = { amount = it },
-                        onVoiceClick = { requestVoiceInput() }
+                        onVoiceClick = { requestVoiceInput(1) }
                     )
 
                     QuickAmountChips(
-                        onAmountSelected = { amount = formatRupiah(it.toString()) }
+                        onAmountSelected = { amount = formatRupiahInput(it) }
                     )
 
                     OutlinedTextField(
@@ -1221,7 +1311,7 @@ fun DrawerHome(
                         placeholder = { Text("Contoh: Makan siang, gaji, bensin") },
                         leadingIcon = { Icon(Icons.Default.Info, contentDescription = null) },
                         trailingIcon = {
-                            IconButton(onClick = { requestVoiceInput() }) {
+                            IconButton(onClick = { requestVoiceInput(2) }) {
                                 Icon(Icons.Default.Mic, contentDescription = "Isi dengan voice")
                             }
                         },
@@ -1242,7 +1332,7 @@ fun DrawerHome(
 
                     Button(
                         onClick = {
-                            val safeAmount = amount.replace(".", "").trim().toIntOrNull() ?: 0
+                            val safeAmount = parseRupiah(amount)
 
                             authViewModel.addTransaction(
                                 amount = safeAmount,
@@ -1308,6 +1398,7 @@ private fun DrawerHeader(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ModeSelector(
     selectedMode: Int,
@@ -1421,7 +1512,7 @@ private fun AmountField(
     OutlinedTextField(
         value = amount,
         onValueChange = { newValue ->
-            val raw = newValue.replace(".", "").trim()
+            val raw = newValue.filter(Char::isDigit)
 
             when {
                 raw.isEmpty() -> {
@@ -1430,7 +1521,7 @@ private fun AmountField(
                 }
                 raw.all(Char::isDigit) -> {
                     isError = false
-                    onAmountChange(formatRupiah(raw))
+                    onAmountChange(formatRupiahInput(raw))
                 }
                 else -> {
                     isError = true
@@ -1449,7 +1540,7 @@ private fun AmountField(
             if (isError) Text("Nominal hanya boleh angka")
             else Text("Titik ribuan akan otomatis ditambahkan")
         },
-        leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) },
+        leadingIcon = { RupiahIcon() },
         trailingIcon = {
             IconButton(onClick = onVoiceClick) {
                 Icon(Icons.Default.Mic, contentDescription = "Isi nominal dengan voice")
@@ -1462,6 +1553,7 @@ private fun AmountField(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QuickAmountChips(
     onAmountSelected: (Int) -> Unit,
@@ -1795,7 +1887,7 @@ private fun BulkTransactionCard(
     onDraftChange: (TransactionDraft) -> Unit,
     onRemove: () -> Unit
 ) {
-    val rowAmount = if (draft.amount > 0) formatRupiah(draft.amount.toString()) else ""
+    val rowAmount = if (draft.amount > 0) formatRupiahInput(draft.amount) else ""
     val rowType = if (draft.type == "income") 1 else 0
 
     Card(
@@ -1838,14 +1930,14 @@ private fun BulkTransactionCard(
             OutlinedTextField(
                 value = rowAmount,
                 onValueChange = { value ->
-                    val raw = value.replace(".", "").trim()
+                    val raw = value.filter(Char::isDigit)
                     if (raw.all(Char::isDigit)) {
-                        onDraftChange(draft.copy(amount = raw.toIntOrNull() ?: 0))
+                        onDraftChange(draft.copy(amount = parseRupiah(raw)))
                     }
                 },
                 label = { Text("Nominal") },
                 placeholder = { Text("0") },
-                leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null) },
+                leadingIcon = { RupiahIcon() },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -1997,9 +2089,9 @@ fun DrawerTarget(authViewModel: AuthViewModel, onSaved: () -> Unit) {
         item {
             OutlinedTextField(
                 value = targetAmount,
-                onValueChange = { targetAmount = it },
+                onValueChange = { targetAmount = formatRupiahInput(it) },
                 label = { Text("Total Target (Rp)") },
-                leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
+                leadingIcon = { RupiahIcon() },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -2010,9 +2102,9 @@ fun DrawerTarget(authViewModel: AuthViewModel, onSaved: () -> Unit) {
         item {
             OutlinedTextField(
                 value = perMonth,
-                onValueChange = { perMonth = it },
+                onValueChange = { perMonth = formatRupiahInput(it) },
                 label = { Text("Nabung per bulan (Rp)") },
-                leadingIcon = { Icon(Icons.Default.Savings, null) },
+                leadingIcon = { RupiahIcon() },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -2040,8 +2132,8 @@ fun DrawerTarget(authViewModel: AuthViewModel, onSaved: () -> Unit) {
                         title = name,
                         subtitle = subtitle,
                         icon = selectedIcon,
-                        targetAmount = targetAmount.toIntOrNull() ?: 0,
-                        perMonth = perMonth.toIntOrNull() ?: 0,
+                        targetAmount = parseRupiah(targetAmount),
+                        perMonth = parseRupiah(perMonth),
                         createdAt = createdDate
                     )
                     onSaved()
@@ -2077,3 +2169,4 @@ fun formatDate(millis: Long): String {
         Date(millis)
     )
 }
+    

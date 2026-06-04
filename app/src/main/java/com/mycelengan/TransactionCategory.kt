@@ -1,7 +1,6 @@
 package com.mycelengan
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.HealthAndSafety
@@ -35,7 +34,7 @@ val transactionCategories = listOf(
     TransactionCategory("bills", "Tagihan", Icons.Default.ReceiptLong),
     TransactionCategory("health", "Kesehatan", Icons.Default.HealthAndSafety),
     TransactionCategory("education", "Edukasi", Icons.Default.School),
-    TransactionCategory("salary", "Gaji", Icons.Default.AttachMoney),
+    TransactionCategory("salary", "Gaji", Icons.Default.Savings),
     TransactionCategory("saving", "Tabungan", Icons.Default.Savings),
     TransactionCategory("other", "Lainnya", Icons.Default.Edit)
 )
@@ -50,4 +49,3 @@ fun transactionCategoryIcon(key: String): ImageVector {
     }
     return transactionCategories.firstOrNull { it.key == normalized }?.icon ?: Icons.Default.Edit
 }
-

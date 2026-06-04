@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.mycelengan.AuthViewModel
+import com.mycelengan.formatRupiah
 import com.mycelengan.R
 import com.mycelengan.TargetItem
 import com.mycelengan.ui.theme.bluelogo
@@ -108,7 +109,7 @@ fun TargetPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 12.dp)
+            .padding(horizontal = 24.dp)
     ) {
 
         // ================= HEADER =================
@@ -308,12 +309,12 @@ fun TargetCard(
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(
-                    "Terkumpul: Rp${formatRupiahStr(item.currentAmount.toString())}",
+                    "Terkumpul: ${formatRupiah(item.currentAmount)}",
                     color = colorIncome,
                     fontSize = 13.sp
                 )
                 Text(
-                    "Target: Rp${formatRupiahStr(item.targetAmount.toString())}",
+                    "Target: ${formatRupiah(item.targetAmount)}",
                     fontSize = 13.sp
                 )
             }

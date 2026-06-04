@@ -15,7 +15,9 @@ fun MyAppNavigation(
     modifier: Modifier = Modifier,
     authViewModel: AuthViewModel,
     darkMode: Boolean,
-    onDarkModeChange: (Boolean) -> Unit
+    onDarkModeChange: (Boolean) -> Unit,
+    notificationEnabled: Boolean,
+    onNotificationChange: (Boolean) -> Unit
 ) {
 
     val navController =
@@ -105,7 +107,13 @@ fun MyAppNavigation(
                     darkMode,
 
                 onDarkModeChange =
-                    onDarkModeChange
+                    onDarkModeChange,
+
+                notificationEnabled =
+                    notificationEnabled,
+
+                onNotificationChange =
+                    onNotificationChange
             )
         }
 
@@ -118,7 +126,9 @@ fun MyAppNavigation(
                 navController,
                 authViewModel,
                 darkMode,
-                onDarkModeChange
+                onDarkModeChange,
+                notificationEnabled,
+                onNotificationChange
             )
         }
 

@@ -22,8 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material.icons.filled.Info
@@ -32,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -60,12 +61,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
 import com.mycelengan.AuthViewModel
+import com.mycelengan.RupiahIcon
 import com.mycelengan.TargetItem
+import com.mycelengan.formatRupiah
+import com.mycelengan.formatRupiahInput
+import com.mycelengan.formatSignedRupiah
+import com.mycelengan.parseRupiah
 import com.mycelengan.ui.theme.bluelogo
 import com.mycelengan.ui.theme.colorExpense
 import com.mycelengan.ui.theme.colorIncome
-import java.text.NumberFormat
-import java.util.Locale
 import kotlin.math.absoluteValue
 
 
@@ -102,54 +106,52 @@ fun TargetDetailPage(
         if (item.targetAmount == 0) 0f
         else (item.currentAmount.toFloat() / item.targetAmount).coerceIn(0f, 1f)
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // ====================== TOP BAR =========================
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(64.dp)
-                .background(MaterialTheme.colorScheme.surface),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = { navController.popBackStack() }) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Kembali",
-                    tint = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Text(
-                text = item.title,
-                modifier = Modifier.padding(start = 8.dp),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(Modifier.weight(1f))
-
-            IconButton(onClick = { showDialog = true }) {
-                Icon(
-                    Icons.Default.Edit,
-                    contentDescription = "Edit",
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        // ====================== SCROLL CONTENT =========================
         Column(
             modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 40.dp)
+                .fillMaxSize()
         ) {
+            // ====================== TOP BAR =========================
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .height(64.dp)
+                    .background(MaterialTheme.colorScheme.surface),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        contentDescription = "Kembali",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Text(
+                    text = item.title,
+                    modifier = Modifier.padding(start = 8.dp),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(Modifier.weight(1f))
+
+                Spacer(Modifier.width(8.dp))
+            }
+
+            // ====================== SCROLL CONTENT =========================
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 120.dp)
+            ) {
 
             // Header icon
             Card(
@@ -223,7 +225,7 @@ fun TargetDetailPage(
                 Column(Modifier.padding(20.dp)) {
 
                     Text(
-                        "Rp${formatRupiah(item.targetAmount.toString())}",
+                        formatRupiah(item.targetAmount),
                         fontWeight = FontWeight.Bold,
                         fontSize = 28.sp,
                         color = MaterialTheme.colorScheme.primary
@@ -240,7 +242,7 @@ fun TargetDetailPage(
 
                     InfoRow(
                         label = "Progres",
-                        value = "Rp${formatRupiah(item.currentAmount.toString())} / Rp${formatRupiah(item.targetAmount.toString())}"
+                        value = "${formatRupiah(item.currentAmount)} / ${formatRupiah(item.targetAmount)}"
                     )
                 }
             }
@@ -327,6 +329,21 @@ fun TargetDetailPage(
                 }
             }
         }
+        }
+
+        FloatingActionButton(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 88.dp),
+            containerColor = bluelogo,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            onClick = { showDialog = true }
+        ) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = "Tambah tabungan"
+            )
+        }
     }
 }
 
@@ -354,7 +371,7 @@ fun HistoryRow(amount: Int, type: String, desc: String, timestamp: Any?) {
             }
 
             Text(
-                text = "$prefix Rp${formatRupiah(amount.toString())}",
+                text = formatSignedRupiah(type, amount),
                 color = color,
                 fontWeight = FontWeight.Bold
             )
@@ -391,20 +408,6 @@ fun InfoRow(
                 MaterialTheme.colorScheme.onSurface
         )
     }
-}
-
-fun formatRupiahInput(raw: String): String {
-    if (raw.isEmpty()) return ""
-    val clean = raw.replace("[^\\d]".toRegex(), "")
-    if (clean.isEmpty()) return ""
-    val number = clean.toLong()
-    val formatted = NumberFormat.getInstance(Locale("id", "ID")).format(number)
-    return "Rp $formatted"
-}
-
-fun parseRupiah(raw: String): Int {
-    val clean = raw.replace("[^\\d]".toRegex(), "")
-    return clean.toIntOrNull() ?: 0
 }
 
 @Composable
@@ -491,7 +494,7 @@ fun EditProgressDialog(
                         nominal = formatRupiahInput(input)
                     },
                     label = { Text("Nominal") },
-                    leadingIcon = { Icon(Icons.Default.AttachMoney, null) },
+                    leadingIcon = { RupiahIcon() },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )

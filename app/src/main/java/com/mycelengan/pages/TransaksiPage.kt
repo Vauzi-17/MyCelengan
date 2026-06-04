@@ -8,8 +8,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.TrendingDown
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -17,6 +15,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,49 +24,58 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mycelengan.AuthViewModel
+import com.mycelengan.formatSignedRupiah
+import com.mycelengan.transactionCategoryIcon
+import com.mycelengan.ui.theme.colorExpense
+import com.mycelengan.ui.theme.colorIncome
 
 data class TransactionUi(
     val title: String,
     val date: String,
     val amount: String,
-    val income: Boolean
+    val income: Boolean,
+    val icon: String
 )
 
 @Composable
 fun TransaksiPage(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    authViewModel: AuthViewModel
 ) {
 
     var selectedTab by remember {
         mutableStateOf(0)
     }
 
-    val data = remember {
+    val transactions =
+        authViewModel.transactions.observeAsState(emptyList())
 
-        listOf(
-
-            TransactionUi(
-                "Makan",
-                "24 Mei",
-                "-Rp25.000",
-                false
-            ),
+    val data =
+        transactions.value.map { item ->
+            val income =
+                item["type"] == "income"
 
             TransactionUi(
-                "Gaji",
-                "23 Mei",
-                "+Rp2.500.000",
-                true
-            ),
-
-            TransactionUi(
-                "Transport",
-                "22 Mei",
-                "-Rp15.000",
-                false
+                title =
+                    item["desc"]
+                        ?.toString()
+                        .orEmpty()
+                        .ifBlank { "Transaksi" },
+                date =
+                    item["date"]
+                        ?.toString()
+                        .orEmpty(),
+                amount =
+                    formatSignedRupiah(item["type"].toString(), item["amount"]),
+                income =
+                    income,
+                icon =
+                    item["icon"]
+                        ?.toString()
+                        .orEmpty()
             )
-        )
-    }
+        }
 
     val filtered = when (
         selectedTab
@@ -93,8 +101,11 @@ fun TransaksiPage(
             modifier
                 .fillMaxSize()
                 .padding(
-                    horizontal = 20.dp
+                    horizontal = 24.dp
                 ),
+
+        contentPadding =
+            PaddingValues(bottom = 120.dp),
 
         verticalArrangement =
             Arrangement.spacedBy(
@@ -102,15 +113,6 @@ fun TransaksiPage(
             )
 
     ) {
-
-        item {
-
-            Spacer(
-                Modifier.height(
-                    16.dp
-                )
-            )
-        }
 
         item {
 
@@ -334,17 +336,7 @@ fun TransaksiPage(
 
                     Icon(
 
-                        if (
-                            it.income
-                        )
-
-                            Icons.Default
-                                .TrendingUp
-
-                        else
-
-                            Icons.Default
-                                .TrendingDown,
+                        transactionCategoryIcon(it.icon),
 
                         null
                     )
@@ -391,15 +383,11 @@ fun TransaksiPage(
                                 it.income
                             )
 
-                                Color(
-                                    0xFF27AE60
-                                )
+                                colorIncome
 
                             else
 
-                                Color(
-                                    0xFFE74C3C
-                                )
+                                colorExpense
                     )
                 }
 

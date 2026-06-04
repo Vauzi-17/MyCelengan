@@ -1,6 +1,7 @@
 package com.mycelengan.pages
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -13,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -26,7 +26,6 @@ import androidx.navigation.NavController
 import com.mycelengan.AuthState
 import com.mycelengan.AuthViewModel
 import com.mycelengan.R
-import com.mycelengan.ui.theme.bluelogo
 
 @Composable
 fun SignupPage(
@@ -71,6 +70,7 @@ fun SignupPage(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 24.dp)
             .imePadding(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -83,13 +83,13 @@ fun SignupPage(
                 painterResource(R.drawable.logo_out),
                 contentDescription = "logo",
                 modifier = Modifier.size(160.dp),
-                tint = bluelogo
+                tint = MaterialTheme.colorScheme.primary
             )
 
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "Sign up to My Celengan",
+                "Daftar ke My Celengan",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -98,21 +98,21 @@ fun SignupPage(
             Spacer(Modifier.height(28.dp))
         }
 
-        // USERNAME FIELD
+        // FIELD USERNAME
         item {
             OutlinedTextField(
                 value = username,
                 onValueChange = { username = it },
                 leadingIcon = { Icon(Icons.Default.AccountCircle, null) },
                 singleLine = true,
-                label = { Text("Username") },
+                label = { Text("Nama pengguna") },
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(Modifier.height(16.dp))
         }
 
-        // EMAIL FIELD
+        // FIELD EMAIL
         item {
             OutlinedTextField(
                 value = email,
@@ -126,13 +126,13 @@ fun SignupPage(
             Spacer(Modifier.height(16.dp))
         }
 
-        // PASSWORD FIELD
+        // FIELD PASSWORD
         item {
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 singleLine = true,
-                label = { Text("Password") },
+                label = { Text("Kata sandi") },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = if (isPasswordVisible)
                     VisualTransformation.None
@@ -152,7 +152,7 @@ fun SignupPage(
             Spacer(Modifier.height(24.dp))
         }
 
-        // SIGN UP BUTTON + LOADING
+        // TOMBOL DAFTAR + LOADING
         item {
 
             val isLoading = authState.value == AuthState.Loading
@@ -163,37 +163,49 @@ fun SignupPage(
                 },
                 enabled = !isLoading,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(bluelogo)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                )
             ) {
 
                 if (isLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(22.dp),
                         strokeWidth = 2.5.dp,
-                        color = MaterialTheme.colorScheme.onBackground
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Create account")
+                    Text("Buat akun")
                 }
             }
 
             Spacer(Modifier.height(24.dp))
         }
 
-        // OR DIVIDER
+        // PEMBATAS
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Divider(modifier = Modifier.weight(1f))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
                 Spacer(Modifier.width(12.dp))
-                Text("Or")
+                Text(
+                    "Atau",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 Spacer(Modifier.width(12.dp))
-                Divider(modifier = Modifier.weight(1f))
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
             }
 
             Spacer(Modifier.height(24.dp))
         }
 
-        // GOOGLE BUTTON
+        // TOMBOL GOOGLE
         item {
             OutlinedButton(
                 onClick = { },
@@ -211,14 +223,14 @@ fun SignupPage(
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(12.dp))
-                    Text("Sign up with Google", fontWeight = FontWeight.Bold)
+                    Text("Daftar dengan Google", fontWeight = FontWeight.Bold)
                 }
             }
 
             Spacer(Modifier.height(16.dp))
         }
 
-        // APPLE BUTTON
+        // TOMBOL APPLE
         item {
             OutlinedButton(
                 onClick = {},
@@ -236,17 +248,17 @@ fun SignupPage(
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(12.dp))
-                    Text("Sign up with Apple", fontWeight = FontWeight.Bold)
+                    Text("Daftar dengan Apple", fontWeight = FontWeight.Bold)
                 }
             }
 
             Spacer(Modifier.height(24.dp))
         }
 
-        // LINK TO LOGIN
+        // LINK KE LOGIN
         item {
             TextButton(onClick = { navController.navigate("login") }) {
-                Text("Already have an account? Log in")
+                Text("Sudah punya akun? Masuk")
             }
 
             Spacer(Modifier.height(70.dp))

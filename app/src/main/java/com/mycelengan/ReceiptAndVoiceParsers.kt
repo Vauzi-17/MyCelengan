@@ -229,6 +229,11 @@ object ReceiptParser {
 }
 
 object VoiceTransactionParser {
+    fun parseAmount(text: String): Int? {
+        val normalized = text.lowercase(Locale("id", "ID")).trim()
+        return (parseNumericAmount(normalized) ?: parseWordAmount(normalized))?.first
+    }
+
     fun parse(text: String, fallbackDate: String): TransactionDraft? {
         val normalized = text.lowercase(Locale("id", "ID")).trim()
 

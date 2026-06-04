@@ -39,7 +39,7 @@ class TransactionRepository {
                 val list = LaravelApi.transactions().map { item ->
                     val iconName = item["icon"].toString()
                     val type = item["type"].toString()
-                    val amount = item["amount"].toString().toIntOrNull() ?: 0
+                    val amount = parseRupiah(item["amount"])
 
                     TransactionItem(
                         icon = iconFromName(iconName),
@@ -61,6 +61,6 @@ class TransactionRepository {
     }
 
     fun formatAmount(type: String, amount: Int): String {
-        return if (type == "income") "+Rp $amount" else "-Rp $amount"
+        return formatSignedRupiah(type, amount)
     }
 }

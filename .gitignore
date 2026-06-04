@@ -13,3 +13,12 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Android build output
+app/release/
+
+# APK
+*.apk
+
+# ZIP
+*.zip

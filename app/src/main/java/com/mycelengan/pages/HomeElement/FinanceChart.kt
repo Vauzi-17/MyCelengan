@@ -1,5 +1,7 @@
 package com.mycelengan.pages.HomeElement
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,9 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -24,6 +27,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mycelengan.ui.theme.bluelogo
@@ -32,9 +36,16 @@ import com.mycelengan.ui.theme.bluelogo
 fun FinanceChart(
     modifier: Modifier = Modifier,
     values: List<Float> = emptyList(),
+    labels: List<String> = emptyList(),
     income: Int = 0,
     expense: Int = 0
 ) {
+    val chartValues = values.map { it.coerceIn(0f, 1f) }
+    val progress by animateFloatAsState(
+        targetValue = if (chartValues.isEmpty()) 0f else 1f,
+        animationSpec = tween(durationMillis = 700),
+        label = "finance_chart_progress"
+    )
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -55,7 +66,7 @@ fun FinanceChart(
         ) {
 
             Text(
-                text = "Ringkasan Keuangan",
+                text = "Grafik Transaksi",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color =
@@ -69,102 +80,106 @@ fun FinanceChart(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
+                    .height(120.dp),
+                contentAlignment = Alignment.Center
             ) {
 
-                Canvas(
-                    modifier =
-                        Modifier.fillMaxSize()
-                ) {
-                    val chartValues =
+                if (chartValues.isEmpty()) {
+                    Text(
+                        text = "Belum ada data transaksi",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                } else {
+                    Canvas(
+                        modifier =
+                            Modifier.fillMaxSize()
+                    ) {
+                        val width = size.width
+                        val height = size.height
+                        val step =
+                            if (chartValues.size <= 1) 0f
+                            else width / (chartValues.size - 1)
 
-                        values.ifEmpty {
+                        val path = Path()
 
-                            List(6) {
-                                0.5f
-                            }
+                        chartValues.forEachIndexed { index, rawValue ->
+                            val value = rawValue * progress
+                            val x =
+                                if (chartValues.size == 1) width / 2
+                                else index * step
+
+                            val y =
+                                height -
+                                        (height * value)
+
+                            if (index == 0)
+                                path.moveTo(
+                                    x,
+                                    y
+                                )
+                            else
+                                path.lineTo(
+                                    x,
+                                    y
+                                )
                         }
 
-                    val width = size.width
-                    val height = size.height
-
-                    val step =
-                        width /
-                                (values.size - 1)
-
-                    val path = Path()
-
-                    chartValues.forEachIndexed { index, value ->
-
-                        val x =
-                            index * step
-
-                        val y =
-                            height -
-                                    (height * value)
-
-                        if (index == 0)
-                            path.moveTo(
-                                x,
-                                y
-                            )
-                        else
-                            path.lineTo(
-                                x,
-                                y
-                            )
-                    }
-
-                    drawPath(
-                        path = path,
-                        color = bluelogo,
-                        style = Stroke(
-                            width = 7f,
-                            cap = StrokeCap.Round
-                        )
-                    )
-
-                    chartValues.forEachIndexed { index, value ->
-
-                        val x =
-                            index * step
-
-                        val y =
-                            height -
-                                    (height * value)
-
-                        drawCircle(
+                        drawPath(
+                            path = path,
                             color = bluelogo,
-                            radius = 10f,
-                            center = Offset(x, y)
+                            style = Stroke(
+                                width = 7f,
+                                cap = StrokeCap.Round
+                            )
                         )
 
-                        drawCircle(
-                            color = Color.White,
-                            radius = 4f,
-                            center = Offset(x, y)
-                        )
+                        chartValues.forEachIndexed { index, rawValue ->
+                            val value = rawValue * progress
+                            val x =
+                                if (chartValues.size == 1) width / 2
+                                else index * step
+
+                            val y =
+                                height -
+                                        (height * value)
+
+                            drawCircle(
+                                color = bluelogo,
+                                radius = 10f,
+                                center = Offset(x, y)
+                            )
+
+                            drawCircle(
+                                color = Color.White,
+                                radius = 4f,
+                                center = Offset(x, y)
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(
-                Modifier.height(12.dp)
-            )
+            if (chartValues.isNotEmpty()) {
+                Spacer(
+                    Modifier.height(12.dp)
+                )
 
-            Row(
-                modifier =
-                    Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.SpaceBetween
-            ) {
+                Row(
+                    modifier =
+                        Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.SpaceBetween
+                ) {
 
-                ChartLabel("Jan")
-                ChartLabel("Feb")
-                ChartLabel("Mar")
-                ChartLabel("Apr")
-                ChartLabel("Mei")
-                ChartLabel("Jun")
+                    chartValues.forEachIndexed { index, _ ->
+                        ChartLabel(
+                            text = labels.getOrNull(index) ?: "${index + 1}",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
         }
     }
@@ -172,12 +187,15 @@ fun FinanceChart(
 
 @Composable
 private fun ChartLabel(
-    text: String
+    text: String,
+    modifier: Modifier = Modifier
 ) {
 
     Text(
+        modifier = modifier,
         text = text,
         fontSize = 11.sp,
+        textAlign = TextAlign.Center,
         color =
             MaterialTheme.colorScheme
                 .onSurfaceVariant

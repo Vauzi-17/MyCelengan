@@ -10,7 +10,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object LaravelApi {
-    private const val BASE_URL = "http://192.168.137.1:8000/api/"
+    private const val BASE_URL = "http://192.168.18.10:8000/api/"
     private const val PREFS_NAME = "my_celengan_session"
     private const val TOKEN_KEY = "token"
 
